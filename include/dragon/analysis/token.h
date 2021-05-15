@@ -1,8 +1,8 @@
 #ifndef __DRAGON_TOKEN__
 #define __DRAGON_TOKEN__
 
-#include "common.h"
-#include "structures/bimap.h"
+#include "dragon/common.h"
+#include "dragon/structures/bimap.h"
 #include <string>
 
 #define KEYPAIR(x, y) std::make_pair(x, y)

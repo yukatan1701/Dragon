@@ -4,7 +4,7 @@
 # Also you can use 'space' to put " " character and
 # 'newline' to add a line break manually.
 
-a = 7 + 3
+a = 7.3 + 3
 b = (a + 2) * 8
 println b
 a = (a / 2) % 2

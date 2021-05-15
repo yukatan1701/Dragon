@@ -1,6 +1,6 @@
-#include "token.h"
+#include "dragon/analysis/token.h"
 
-const std::string Keyword::mPunctuations = "+,-*/%^|&!()[]<>=";
+const std::string Keyword::mPunctuations = "+,-*/%^|&!()[]:<>=\"";
 
 const Bimap<Keyword::Kind, std::string> Keyword::mKindToName = {
   KEYPAIR(Keyword::FUNCTION, "function"),
@@ -37,7 +37,7 @@ const Bimap<Keyword::Kind, std::string> Keyword::mKindToName = {
   KEYPAIR(Keyword::RIGHT_PARENTHESIS, ")"),
   KEYPAIR(Keyword::LEFT_SQUARE, "["),
   KEYPAIR(Keyword::RIGHT_SQUARE, "]"),
-  KEYPAIR(Keyword::COLON, ","),
+  KEYPAIR(Keyword::COLON, ":"),
   KEYPAIR(Keyword::QUOTE, "\""),
   KEYPAIR(Keyword::GOTO, "goto"),
   KEYPAIR(Keyword::GLOBAL, "global")

@@ -1,4 +1,4 @@
-#include "lexical_analyzer.h"
+#include "dragon/analysis/lexical_analyzer.h"
 #include <iostream>
 #include <fstream>
 

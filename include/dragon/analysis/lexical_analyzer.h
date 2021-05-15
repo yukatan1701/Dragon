@@ -1,7 +1,7 @@
 #ifndef __DRAGON_PARSER__
 #define __DRAGON_PARSER__
 
-#include "token.h"
+#include "dragon/analysis/token.h"
 #include <iostream>
 #include <istream>
 #include <vector>

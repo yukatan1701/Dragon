@@ -1,4 +1,4 @@
-#include "lexical_analyzer.h"
+#include "dragon/analysis/lexical_analyzer.h"
 
 LexicalAnalyzer::LexicalAnalyzer(std::istream &IS) : mLineN(0) {
   std::string Line;
@@ -101,11 +101,18 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
 }
 
 void LexicalAnalyzer::dump() const {
-  dbgs() << "[LEXICAL ANALYZER] Tokens: " << "\n";
+  dbgs() << "[LEXICAL ANALYZER] Printing tokens:\n";
+  std::size_t LineN = 1;
+  auto MaxNumLength = std::to_string(mTokens.size()).size();
   for (auto &TokenList : mTokens) {
+    auto NumLength = std::to_string(LineN).size();
+    std::string Space(MaxNumLength - NumLength, ' ');
+    dbgs() << Space << LineN << "| ";
     for (auto &Token : TokenList) {
       dbgs() << Token.get()->toString() << " ";
     }
     dbgs() << "\n";
+    ++LineN;
   }
+  dbgs() << "[LEXICAL ANALYZER] End printing tokens.\n";
 }
