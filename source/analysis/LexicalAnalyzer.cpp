@@ -1,4 +1,4 @@
-#include "dragon/analysis/lexical_analyzer.h"
+#include "dragon/analysis/LexicalAnalyzer.h"
 
 LexicalAnalyzer::LexicalAnalyzer(std::istream &IS) : mLineN(0) {
   std::string Line;
@@ -19,12 +19,17 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
   auto isNumberChar = [](const char &Ch) {
     return std::isdigit(Ch) || Ch == '.';
   };
-  auto getErrorPos = [this, &Buffer](const CharBuffer::ConstIterator &Itr) {
+  auto getPos = [this, &Buffer](const CharBuffer::ConstIterator &Itr) {
     auto ColN = Itr.getPtr() - Buffer.cbegin().getPtr() + 1;
-    return std::to_string(mLineN) + ":" + std::to_string(ColN);
+    return std::make_pair(mLineN, ColN);
   };
-  const std::string CharsAfterNumber = Keyword::getPunctStr() + "# ";
+  auto getErrorPos = [this, &Buffer, &getPos](const CharBuffer::ConstIterator &Itr) {
+    auto Pos = getPos(Itr);
+    return std::to_string(Pos.first) + ":" + std::to_string(Pos.second);
+  };
+  const std::string CharsAfterNumber = Keyword::getPunctStr() + "# \t\n";
   for (auto Itr = Buffer.cbegin(); Itr != Buffer.cend(); ++Itr) {
+    auto WordBegin = Itr;
     auto &Peek = *Itr;
     //DRAGON_DEBUG(dbgs() << "[PARSER] Current char: " << Peek << "\n");
     if (std::isspace(Peek))
@@ -46,21 +51,24 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
       if (NumStr[0] == '.' && NumStr.size() == 1)
         throw ParserException("Invalid number format at " + getErrorPos(Itr));
       if (NumStr.find('.') == std::string::npos)
-        TokenList.push_back(std::make_unique<IntConstant>(std::stoi(NumStr)));
+        TokenList.push_back(std::make_unique<IntConstant>(std::stoi(NumStr),
+                            getPos(WordBegin)));
       else
-        TokenList.push_back(std::make_unique<FloatConstant>(std::stod(NumStr)));
+        TokenList.push_back(std::make_unique<FloatConstant>(std::stod(NumStr),
+                            getPos(WordBegin)));
     } else if (std::isalpha(Peek) || Peek == '_') {
       std::string Word { Peek };
       auto Next = Buffer.lookAhead(Itr);
-      while (Next && std::isalnum(*Next)) {
+      while (Next && (std::isalnum(*Next) || *Next == '_')) {
         Word += *Next;
         ++Itr;
         Next = Buffer.lookAhead(Itr);
       }
       if (Keyword::isKeyword(Word)) {
-        TokenList.push_back(std::make_unique<Keyword>(Word));
+        Keyword::addDynamicKeyword(Word, TokenList, getPos(WordBegin));
       } else {
-        TokenList.push_back(std::make_unique<Identifier>(Word));
+        TokenList.push_back(std::make_unique<Identifier>(Word,
+                            getPos(WordBegin)));
       }
     } else if (Peek == '#') {
       return;
@@ -78,7 +86,8 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
       while (Len > 0 && !Keyword::isKeyword(Word.substr(0, Len)))
         --Len;
       assert(Len > 0 && "Punctuation character must have a keyword!");
-      TokenList.push_back(std::make_unique<Keyword>(Word.substr(0, Len)));
+      Keyword::addDynamicKeyword(Word.substr(0, Len), TokenList,
+                                 getPos(WordBegin));
       --Len;
       while (Len) {
         ++Itr;
@@ -93,7 +102,7 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
       }
       if (Itr == Buffer.cend())
         throw ParserException("Incomplete literal at " + getErrorPos(Itr));
-      TokenList.push_back(std::make_unique<String>(Word));
+      TokenList.push_back(std::make_unique<String>(Word, getPos(WordBegin)));
     } else {
       throw ParserException("Invalid characher at " + getErrorPos(Itr));
     }

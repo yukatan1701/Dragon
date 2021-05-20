@@ -1,16 +1,13 @@
-#ifndef __DRAGON_PARSER__
-#define __DRAGON_PARSER__
+#ifndef __DRAGON_LEXICAL_ANALYZER__
+#define __DRAGON_LEXICAL_ANALYZER__
 
-#include "dragon/analysis/token.h"
+#include "dragon/analysis/Token.h"
 #include <iostream>
 #include <istream>
 #include <vector>
 #include <memory>
 #include <optional>
 #include <exception>
-
-typedef std::unique_ptr<Token> TokenPtr;
-typedef std::vector<std::vector<TokenPtr>> TokenList;
 
 class CharBuffer {
 public:
@@ -78,11 +75,12 @@ private:
 
 class LexicalAnalyzer {
 public:
+  typedef std::vector<std::vector<std::unique_ptr<Token>>> TokenList;
   LexicalAnalyzer(std::istream &IS);
+  const TokenList &getTokenList() const { return mTokens; }
   void dump() const;
 private:
   void parseLine(const std::string &Line);
-  
   TokenList mTokens;
   int mLineN;
 };

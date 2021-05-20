@@ -26,9 +26,10 @@ function ar_sum(n)
 function get100()
 	return 100	
 	
-global
+function main()
 	s = ar_sum(9 + 1)
 	printvalue(s)
 	printsomething()
 	println get100()
 	println sum_two(14, 9)
+	return

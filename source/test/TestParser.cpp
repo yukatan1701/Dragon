@@ -1,4 +1,5 @@
-#include "dragon/analysis/lexical_analyzer.h"
+#include "dragon/analysis/LexicalAnalyzer.h"
+#include "dragon/analysis/SyntaxAnalyzer.h"
 #include <iostream>
 #include <fstream>
 
@@ -17,10 +18,12 @@ int main(int argc, char **argv) {
   }
   try {
     LexicalAnalyzer LA(File);
-  } catch (ParserException &E) {
+    SyntaxAnalyzer SA(LA);
+  } catch (std::exception &E) {
     DRAGON_DEBUG(dbgs() << "Exception occured:\n");
     DRAGON_DEBUG(dbgs() << E.what());
   }
   File.close();
+  
   return 0;
 }

@@ -11,8 +11,9 @@ set(CMAKE_CXX_FLAGS "-Wall")
 include_directories(include)
 
 file(GLOB_RECURSE ALL_SOURCES
-  source/analysis/token.cpp
-  source/analysis/lexical_analyzer.cpp
+  source/analysis/Token.cpp
+  source/analysis/LexicalAnalyzer.cpp
+  source/analysis/SyntaxAnalyzer.cpp
   source/test/*.cpp
 )
 
