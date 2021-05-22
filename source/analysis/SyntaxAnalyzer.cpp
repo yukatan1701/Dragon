@@ -1,13 +1,12 @@
 #include "dragon/analysis/SyntaxAnalyzer.h"
+#include <algorithm>
 #include <stack>
 
 typedef LexicalAnalyzer::TokenList TokenList;
 typedef SyntaxAnalyzer::FuncMap FuncMap;
 
-void SyntaxAnalyzer::generatePostfix(const TokenList &TL,
-                     const TokenList::const_iterator &ItrBegin,
-                     const TokenList::const_iterator &ItrEnd,
-                     Function &F) {
+
+void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
   typedef std::pair<Keyword *, std::size_t> IfWhilePos;
   // TODO: square brackets
   auto isFunction = [this](const Identifier *Id) {
@@ -25,11 +24,10 @@ void SyntaxAnalyzer::generatePostfix(const TokenList &TL,
   };
   std::stack<IfWhilePos> IfWhileStack;
   auto &PostfixList = F.getPostfixList();
-  for (auto Itr = ItrBegin; Itr != ItrEnd; ++Itr) {
+  for (auto Itr = TL.begin(); Itr != TL.end(); ++Itr) {
     auto &Line = PostfixList.emplace_back();
     std::stack<Token *> Stack;
-    for (auto &Token : *Itr) {
-      auto TokenPtr = Token.get();
+    for (auto &TokenPtr : *Itr) {
       if (dynamic_cast<Constant *>(TokenPtr) ||
           dynamic_cast<String *>(TokenPtr)) {
         Line.push_back(TokenPtr);
@@ -175,22 +173,25 @@ void SyntaxAnalyzer::generatePostfix(const TokenList &TL,
 }
 
 SyntaxAnalyzer::SyntaxAnalyzer(const LexicalAnalyzer &LA) {
-  auto &TokenList = LA.getTokenList();
-  auto getReturnIterator = [&TokenList](TokenList::const_iterator Itr) {
-    for (; Itr != TokenList.end(); ++Itr) {
+  auto &TL = LA.getTokenList();
+  auto getReturnIterator = [&TL](TokenList::const_iterator Itr) {
+    for (; Itr != TL.end(); ++Itr) {
       if (Itr->empty())
         continue;
       auto Kw = dynamic_cast<Keyword *>((*Itr)[0].get());
       if (!Kw)
         continue;
       if (Kw->getKind() == Keyword::Kind::FUNCTION)
-        return TokenList.end();
+        return TL.end();
       if (Kw->getKind() == Keyword::Kind::RETURN)
         break;
     }
     return Itr;
   };
-  for (auto Itr = TokenList.begin(); Itr != TokenList.end(); ++Itr) {
+  auto &GlobF = mFuncMap.insert(std::make_pair(
+      GLOBAL_FUNC, Function(GLOBAL_FUNC))).first->second;
+  TokenPtrList GlobalTL;
+  for (auto Itr = TL.begin(); Itr != TL.end(); ++Itr) {
     auto &TokenLine = *Itr;
     if (TokenLine.empty())
       continue;
@@ -246,12 +247,20 @@ SyntaxAnalyzer::SyntaxAnalyzer(const LexicalAnalyzer &LA) {
               }
             }
             auto ReturnItr = getReturnIterator(std::next(Itr));
-            if (ReturnItr == TokenList.end()) {
+            if (ReturnItr == TL.end()) {
               throw SyntaxException("Return statement for function `" +
                                     Func.getName() + "` declared on " +
                                     Kw->getPos() + " not found");
             }
-            generatePostfix(TokenList, std::next(Itr), std::next(ReturnItr), Func);
+            TokenPtrList TLPtr;
+            std::for_each(std::next(Itr), std::next(ReturnItr),
+                [&TLPtr](const std::vector<std::unique_ptr<Token>> &UPV) {
+                  auto &LastLine = TLPtr.emplace_back();
+                  for (auto &UP : UPV)
+                    LastLine.push_back(UP.get());
+                });
+            generatePostfix(TLPtr, Func);
+            Itr = ReturnItr;
             mFuncMap.insert(std::make_pair(Func.getName(), std::move(Func)));
           } else {
             throw SyntaxException("'(' expected after token at " +
@@ -263,15 +272,19 @@ SyntaxAnalyzer::SyntaxAnalyzer(const LexicalAnalyzer &LA) {
         }
       } else {
         // check keywords out of function
+        auto &LineGL = GlobalTL.emplace_back();
+        for (auto &UP : TokenLine)
+          LineGL.push_back(UP.get());
       }
     } else {
       // global variable
+      auto &LineGL = GlobalTL.emplace_back();
+      for (auto &UP : TokenLine)
+        LineGL.push_back(UP.get());
     }
   }
-  dump();
-  // create function tables
-  // (function_name) -> (arguments, postfix)
-  // create postfix for every table
+  generatePostfix(GlobalTL, GlobF);
+  DRAGON_DEBUG(dump());
 }
 
 void SyntaxAnalyzer::dump() const {

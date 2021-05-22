@@ -14,4 +14,6 @@ inline std::ostream &dbgs() {
   return std::cerr;
 }
 
+#define GLOBAL_FUNC "@global"
+
 #endif

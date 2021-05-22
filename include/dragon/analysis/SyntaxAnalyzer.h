@@ -31,15 +31,13 @@ private:
 
 class SyntaxAnalyzer {
   typedef LexicalAnalyzer::TokenList TokenList;
+  typedef std::vector<std::vector<Token *>> TokenPtrList;
 public:
   typedef std::map<std::string, Function> FuncMap;
   SyntaxAnalyzer(const LexicalAnalyzer &LA);
   void dump() const;
 private:
-  void generatePostfix(const TokenList &TL,
-                       const TokenList::const_iterator &ItrBegin,
-                       const TokenList::const_iterator &ItrEnd,
-                       Function &F);
+  void generatePostfix(const TokenPtrList &TL, Function &F);
   FuncMap mFuncMap;
   std::vector<std::unique_ptr<Token>> mTmpTokens;
 };
