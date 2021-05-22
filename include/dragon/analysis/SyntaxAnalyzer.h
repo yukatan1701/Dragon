@@ -36,7 +36,12 @@ public:
   SyntaxAnalyzer(const LexicalAnalyzer &LA);
   void dump() const;
 private:
+  void generatePostfix(const TokenList &TL,
+                       const TokenList::const_iterator &ItrBegin,
+                       const TokenList::const_iterator &ItrEnd,
+                       Function &F);
   FuncMap mFuncMap;
+  std::vector<std::unique_ptr<Token>> mTmpTokens;
 };
 
 #endif

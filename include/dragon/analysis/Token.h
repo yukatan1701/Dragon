@@ -36,16 +36,8 @@ public:
   typedef int Priority;
   enum Kind {
     FUNCTION = 0,
-
-    IF,
-    THEN,
-    ELSE,
-    ENDIF,
-    WHILE,
-    ENDWHILE,
     COLON,
     QUOTE,
-    GOTO,
     GLOBAL,
 
     /* brackets */
@@ -65,6 +57,12 @@ public:
     LOGICAL_NOT,
     RETURN,
     COMMA,
+    IF,
+    ELSE,
+    ENDIF,
+    WHILE,
+    ENDWHILE,
+    GOTO_UN,
     UNARY_END,
 
     /* binary operators */
@@ -88,6 +86,7 @@ public:
     MULTIPLY,
     DIVIDE,
     MODULE,
+    GOTO_BIN,
     BINARY_END
   };
   explicit Keyword(Kind Kind) : mKind(Kind) {}

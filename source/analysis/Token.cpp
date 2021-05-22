@@ -8,7 +8,6 @@ const Bimap<Keyword::Kind, std::string> Keyword::mKindToName = {
   KEYPAIR(Keyword::PRINTLN, "println"),
   KEYPAIR(Keyword::PRINT, "print"),
   KEYPAIR(Keyword::IF, "if"),
-  KEYPAIR(Keyword::THEN, "then"),
   KEYPAIR(Keyword::ELSE, "else"),
   KEYPAIR(Keyword::ENDIF, "endif"),
   KEYPAIR(Keyword::WHILE, "while"),
@@ -40,7 +39,8 @@ const Bimap<Keyword::Kind, std::string> Keyword::mKindToName = {
   KEYPAIR(Keyword::RIGHT_SQUARE, "]"),
   KEYPAIR(Keyword::COLON, ":"),
   KEYPAIR(Keyword::QUOTE, "\""),
-  KEYPAIR(Keyword::GOTO, "goto"),
+  KEYPAIR(Keyword::GOTO_BIN, "goto"),
+  KEYPAIR(Keyword::GOTO_UN, "goto*"),
   KEYPAIR(Keyword::GLOBAL, "global")
 };
 
@@ -49,15 +49,15 @@ const std::map<Keyword::Kind, Keyword::Priority> Keyword::mKindToPriority = {
   KEYPAIR(Keyword::RETURN, 100),
   KEYPAIR(Keyword::PRINTLN, 100),
   KEYPAIR(Keyword::PRINT, 100),
-  KEYPAIR(Keyword::IF, -1),
-  KEYPAIR(Keyword::THEN, -1),
+  KEYPAIR(Keyword::IF, 99),
   KEYPAIR(Keyword::ELSE, -1),
   KEYPAIR(Keyword::ENDIF, -1),
-  KEYPAIR(Keyword::WHILE, -1),
+  KEYPAIR(Keyword::WHILE, 99),
   KEYPAIR(Keyword::ENDWHILE, -1),
-  KEYPAIR(Keyword::COLON, -1),
+  KEYPAIR(Keyword::COLON, -1), // TODO: is it necessary?
   KEYPAIR(Keyword::QUOTE, -1),
-  KEYPAIR(Keyword::GOTO, 100),
+  KEYPAIR(Keyword::GOTO_BIN, 101),
+  KEYPAIR(Keyword::GOTO_UN, 101),
   KEYPAIR(Keyword::GLOBAL, -1),
 
   KEYPAIR(Keyword::LEFT_PARENTHESIS, 1),

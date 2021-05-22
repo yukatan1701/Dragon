@@ -4,16 +4,29 @@
 typedef LexicalAnalyzer::TokenList TokenList;
 typedef SyntaxAnalyzer::FuncMap FuncMap;
 
-void generatePostfix(const TokenList &TL, const FuncMap &FM,
+void SyntaxAnalyzer::generatePostfix(const TokenList &TL,
                      const TokenList::const_iterator &ItrBegin,
                      const TokenList::const_iterator &ItrEnd,
                      Function &F) {
+  typedef std::pair<Keyword *, std::size_t> IfWhilePos;
   // TODO: square brackets
-  auto isFunction = [&FM](const Identifier *Id) {
-    return FM.find(Id->getName()) != FM.end();
+  auto isFunction = [this](const Identifier *Id) {
+    return mFuncMap.find(Id->getName()) != mFuncMap.end();
   };
+  auto generateNotGoto = [this](const PostfixList &PL)->
+      std::vector<Token *> {
+    auto NotPtr = mTmpTokens.emplace_back(
+        std::make_unique<Keyword>(Keyword::Kind::LOGICAL_NOT)).get();
+    auto GotoPtr = mTmpTokens.emplace_back(
+        std::make_unique<Keyword>(Keyword::Kind::GOTO_BIN)).get();
+    auto PosPtr = mTmpTokens.emplace_back(
+        std::make_unique<IntConstant>(PL.size())).get();
+    return { NotPtr, PosPtr, GotoPtr };
+  };
+  std::stack<IfWhilePos> IfWhileStack;
+  auto &PostfixList = F.getPostfixList();
   for (auto Itr = ItrBegin; Itr != ItrEnd; ++Itr) {
-    auto &Line = F.getPostfixList().emplace_back();
+    auto &Line = PostfixList.emplace_back();
     std::stack<Token *> Stack;
     for (auto &Token : *Itr) {
       auto TokenPtr = Token.get();
@@ -40,6 +53,52 @@ void generatePostfix(const TokenList &TL, const FuncMap &FM,
           if (!HasLeftBr)
             throw SyntaxException("Bracket mismatch or missed comma at " +
                                   Pref->getPos());
+        } else if (Pref->getKind() == Keyword::Kind::IF ||
+                   Pref->getKind() == Keyword::Kind::WHILE) {
+          IfWhileStack.push(std::make_pair(Pref, PostfixList.size() - 1));
+        } else if (Pref->getKind() == Keyword::Kind::ELSE) {
+          if (IfWhileStack.empty())
+            throw SyntaxException("No `if` for `else` at " + Pref->getPos());
+          auto If = IfWhileStack.top().first;
+          auto IfPos = IfWhileStack.top().second;
+          if (If->getKind() != Keyword::Kind::IF)
+            throw SyntaxException("No `if` for `else` at " + Pref->getPos());
+          auto NotGotoList = generateNotGoto(PostfixList);
+          PostfixList[IfPos].insert(PostfixList[IfPos].end(),
+                                    NotGotoList.begin(), NotGotoList.end());
+          IfWhileStack.pop();
+          IfWhileStack.push(std::make_pair(Pref, PostfixList.size() - 1));
+        } else if (Pref->getKind() == Keyword::Kind::ENDIF) {
+          if (IfWhileStack.empty())
+            throw SyntaxException("No `if` for `endif` at " + Pref->getPos());
+          auto If = IfWhileStack.top().first;
+          auto IfPos = IfWhileStack.top().second;
+          if (If->getKind() != Keyword::Kind::IF &&
+              If->getKind() != Keyword::Kind::ELSE)
+            throw SyntaxException("No `if` or `else` for `endif` at " + Pref->getPos());
+          if (If->getKind() == Keyword::Kind::IF) {
+            auto NotGotoList = generateNotGoto(PostfixList);
+            PostfixList[IfPos].insert(PostfixList[IfPos].end(),
+                                      NotGotoList.begin(), NotGotoList.end());
+          }
+          IfWhileStack.pop();
+        } else if (Pref->getKind() == Keyword::Kind::ENDWHILE) {
+          if (IfWhileStack.empty())
+            throw SyntaxException("No `while` for `endwhile` at " + Pref->getPos());
+          auto While = IfWhileStack.top().first;
+          auto WhilePos = IfWhileStack.top().second;
+          if (While->getKind() != Keyword::Kind::WHILE)
+            throw SyntaxException("No `while` for `endwhile` at " + Pref->getPos());
+          auto NotGotoList = generateNotGoto(PostfixList);
+          PostfixList[WhilePos].insert(PostfixList[WhilePos].end(),
+                                       NotGotoList.begin(), NotGotoList.end());
+          auto GotoPtr = mTmpTokens.emplace_back(
+              std::make_unique<Keyword>(Keyword::Kind::GOTO_UN)).get();
+          auto PosPtr = mTmpTokens.emplace_back(
+              std::make_unique<IntConstant>(WhilePos)).get();
+          Line.push_back(PosPtr);
+          Line.push_back(GotoPtr);
+          IfWhileStack.pop();
         } else {
           Stack.push(Pref);
         }
@@ -108,6 +167,11 @@ void generatePostfix(const TokenList &TL, const FuncMap &FM,
       Stack.pop();
     }
   }
+  if (!IfWhileStack.empty()) {
+    auto TopToken = IfWhileStack.top().first;
+    throw SyntaxException("Pair mismatch for token at " + TopToken->getPos());
+  }
+  PostfixList.emplace_back();
 }
 
 SyntaxAnalyzer::SyntaxAnalyzer(const LexicalAnalyzer &LA) {
@@ -187,7 +251,7 @@ SyntaxAnalyzer::SyntaxAnalyzer(const LexicalAnalyzer &LA) {
                                     Func.getName() + "` declared on " +
                                     Kw->getPos() + " not found");
             }
-            generatePostfix(TokenList, mFuncMap, std::next(Itr), std::next(ReturnItr), Func);
+            generatePostfix(TokenList, std::next(Itr), std::next(ReturnItr), Func);
             mFuncMap.insert(std::make_pair(Func.getName(), std::move(Func)));
           } else {
             throw SyntaxException("'(' expected after token at " +
@@ -211,7 +275,7 @@ SyntaxAnalyzer::SyntaxAnalyzer(const LexicalAnalyzer &LA) {
 }
 
 void SyntaxAnalyzer::dump() const {
-  dbgs() << "[LEXICAL ANALYZER] Postfix form for functions:\n";
+  dbgs() << "[SYNTAX ANALYZER] Postfix form for functions:\n";
   for (auto &Pair : mFuncMap) {
     dbgs() << "Function `" << Pair.first << "`:\n";
     dbgs() << "Parameters: (";
@@ -223,13 +287,20 @@ void SyntaxAnalyzer::dump() const {
     }
     dbgs() << ")\n";
     dbgs() << "Postfix:\n";
-    for (const auto &PostfixLine : Pair.second.getPostfixList()) {
+    std::size_t LineN = 0;
+    auto &PL = Pair.second.getPostfixList();
+    auto MaxNumLength = std::to_string(PL.size()).size();
+    for (const auto &PostfixLine : PL) {
+      auto NumLength = std::to_string(LineN).size();
+      std::string Space(MaxNumLength - NumLength, ' ');
+      dbgs() << Space << LineN << "| ";
       for (auto Token : PostfixLine) {
         dbgs() << Token->toString() << " ";
       }
-      dbgs() << ";\n";
+      dbgs() << "\n";
+      ++LineN;
     }
     dbgs() << "\n";
   }
-  dbgs() << "[LEXICAL ANALYZER] End printing postfix.\n";
+  dbgs() << "[SYNTAX ANALYZER] End printing postfix.\n";
 }
