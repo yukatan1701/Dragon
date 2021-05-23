@@ -20,6 +20,8 @@ public:
   virtual std::string toString() const { return "<unknown token>"; }
   std::string getPos() const { return std::to_string(mLine) + ":" +
                                       std::to_string(mColumn); }
+  virtual Token *clone() const { return new Token(); }
+  virtual ~Token() {}
 protected:
   std::size_t mLine, mColumn;
 };
@@ -29,6 +31,8 @@ public:
   Word() {}
   Word(const PosInfo &PI) : Token(PI) {}
   std::string toString() const { return "<word>"; }
+  Token *clone() const { return new Word(); }
+  ~Word() {}
 };
 
 class Keyword : public Word {
@@ -73,19 +77,20 @@ public:
     BITWISE_OR,
     BITWISE_AND,
     BITWISE_XOR,
+    SHL,
+    SHR,
+    MODULE,
     EQUAL,
     NOT_EQUAL,
+
     LESS,
     LEQ,
     GREATER,
     GEQ,
-    SHL,
-    SHR,
     PLUS,
     MINUS,
     MULTIPLY,
     DIVIDE,
-    MODULE,
     GOTO_BIN,
     BINARY_END
   };
@@ -101,6 +106,12 @@ public:
     return mKindToName.hasValue(Word);
   }
 
+  std::string kindToString() const {
+    auto Res = mKindToName.getValue(mKind);
+    assert(Res && "Keyword must be of declared kind!");
+    return *Res;
+  }
+
   std::string toString() const {
     auto Key = mKindToName.getValue(mKind);
     return Key ? ("<kw: " + *Key + ">") : "<unknown keyword>";
@@ -114,6 +125,8 @@ public:
     return Itr->second;
   }
 
+  Token *clone() const { return new Keyword(mKind); }
+
   static bool isPunctChar(char Char) {
     return mPunctuations.find(Char) != mPunctuations.npos;
   }
@@ -123,6 +136,7 @@ public:
   static void addDynamicKeyword(const std::string &Word,
                                 std::vector<std::unique_ptr<Token>> &TL,
                                 const PosInfo &PI);
+  virtual ~Keyword() {}
 private:
   static const std::string mPunctuations;
   static const Bimap<Kind, std::string> mKindToName;
@@ -134,12 +148,16 @@ class PostfixOperator : public Keyword {
 public:
   explicit PostfixOperator(Kind Kind) : Keyword(Kind) {}
   explicit PostfixOperator(Kind Kind, const PosInfo &PI) : Keyword(Kind, PI) {}
+  Token *clone() const { return new PostfixOperator(this->getKind()); }
+  virtual ~PostfixOperator() {}
 };
 
 class PrefixOperator : public Keyword {
 public:
   explicit PrefixOperator(Kind Kind) : Keyword(Kind) {}
   explicit PrefixOperator(Kind Kind, const PosInfo &PI) : Keyword(Kind, PI) {}
+  Token *clone() const { return new PrefixOperator(this->getKind()); }
+  virtual ~PrefixOperator() {}
 };
 
 class BinaryOperator : public Keyword {
@@ -151,6 +169,8 @@ public:
                           AssocKind AssocKind=LEFT)
       : Keyword(Kind, PI), mAssocKind(AssocKind) {}
   AssocKind getAssocKind() const { return mAssocKind; }
+  Token *clone() const { return new BinaryOperator(this->getKind(), mAssocKind); }
+  virtual ~BinaryOperator() {}
 private:
   AssocKind mAssocKind;
 };
@@ -159,6 +179,8 @@ class Bracket : public Keyword {
 public:
   explicit Bracket(Kind Kind) : Keyword(Kind) {}
   explicit Bracket(Kind Kind, const PosInfo &PI) : Keyword(Kind, PI) {}
+  Token *clone() const { return new Bracket(this->getKind()); }
+  virtual ~Bracket() {}
 };
 
 class Identifier : public Word {
@@ -168,27 +190,36 @@ public:
       : Word(PI), mName(Name) {}
   std::string getName() const { return mName; }
   std::string toString() const { return "<id: " + mName + ">"; }
+  Token *clone() const { return new Identifier(this->getName()); }
+  Identifier *cloneIdentifier() const { return new Identifier(this->getName()); }
+  virtual ~Identifier() {}
 private:
   std::string mName;
-};
-
-class String : public Token {
-public:
-  String(const std::string &Str) : mString(Str) {}
-  String(const std::string &Str, const PosInfo &PI) : Token(PI), mString(Str) {}
-  std::string getValue() const { return mString; }
-  std::string toString() const {
-    return "<literal: " + (mString.empty() ? "(empty)" : mString) + ">";
-  }
-private:
-  std::string mString;
 };
 
 class Constant : public Token {
 public:
   Constant() {}
   Constant(const PosInfo &PI) : Token(PI) {}
-  std::string toString() const { return "<unkown constant>"; }
+  std::string toString() const { return "<unknown constant>"; }
+  Token *clone() const { return new Constant(); }
+  virtual Constant *cloneConst() const { return new Constant(); }
+  virtual ~Constant() {}
+};
+
+class String : public Constant {
+public:
+  String(const std::string &Str) : mString(Str) {}
+  String(const std::string &Str, const PosInfo &PI) : Constant(PI), mString(Str) {}
+  std::string getValue() const { return mString; }
+  std::string toString() const {
+    return "<literal: " + (mString.empty() ? "(empty)" : mString) + ">";
+  }
+  Token *clone() const { return new String(mString); }
+  virtual Constant *cloneConst() const { return new String(mString); }
+  virtual ~String() {}
+private:
+  std::string mString;
 };
 
 class FloatConstant : public Constant {
@@ -196,9 +227,13 @@ public:
   FloatConstant(double Value) : mValue(Value) {}
   FloatConstant(double Value, const PosInfo &PI) : Constant(PI), mValue(Value) {}
   double getValue() { return mValue; }
+  double setValue(double Value) { mValue = Value; return mValue; }
   std::string toString() const {
     return "<float: " + std::to_string(mValue) + ">";
   }
+  Token *clone() const { return new FloatConstant(mValue); }
+  virtual Constant *cloneConst() const { return new FloatConstant(mValue); }
+  virtual ~FloatConstant() {}
 private:
   double mValue;
 };
@@ -208,11 +243,39 @@ public:
   IntConstant(int Value) : mValue(Value) {}
   IntConstant(int Value, const PosInfo &PI) : Constant(PI), mValue(Value) {}
   int getValue() { return mValue; }
+  int setValue(int Value) { mValue = Value; return mValue; }
   std::string toString() const {
     return "<int: " + std::to_string(mValue) + ">";
   }
+  Token *clone() const { return new IntConstant(mValue); }
+  virtual Constant *cloneConst() const { return new IntConstant(mValue); }
+  virtual ~IntConstant() {}
 private:
   int mValue;
+};
+
+class Boolean : public Constant {
+public:
+  Boolean(const std::string &Str) : mValue(Str == "true" ? true : false) {}
+  Boolean(const std::string &Str, const PosInfo &PI)
+      : Constant(PI), mValue(Str == "true" ? true : false) {}
+  Boolean(bool Value) : mValue(Value) {}
+  Boolean(bool Value, const PosInfo &PI) : Constant(PI), mValue(Value) {}
+  bool getValue() { return mValue; }
+  bool setValue(bool Value) { mValue = Value; return mValue; }
+  std::string toString() const {
+    return "<bool: " + std::to_string(mValue) + ">";
+  }
+
+  static bool isBoolean(const std::string &Str) {
+    return Str == "true" || Str == "false";
+  }
+
+  Token *clone() const { return new Boolean(mValue); }
+  virtual Constant *cloneConst() const { return new Boolean(mValue); }
+  virtual ~Boolean() {}
+private:
+  bool mValue;
 };
 
 #endif

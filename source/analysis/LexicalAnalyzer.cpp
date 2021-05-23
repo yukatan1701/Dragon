@@ -66,12 +66,24 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
       }
       if (Keyword::isKeyword(Word)) {
         Keyword::addDynamicKeyword(Word, TokenList, getPos(WordBegin));
+      } else if (Boolean::isBoolean(Word)) {
+        TokenList.push_back(std::make_unique<Boolean>(Word, getPos(WordBegin)));
       } else {
         TokenList.push_back(std::make_unique<Identifier>(Word,
                             getPos(WordBegin)));
       }
     } else if (Peek == '#') {
       return;
+    } else if (Peek == '\"') {
+      std::string Word = "";
+      ++Itr;
+      while (Itr != Buffer.cend() && *Itr != '\"') {
+        Word += *Itr;
+        ++Itr;
+      }
+      if (Itr == Buffer.cend())
+        throw ParserException("Incomplete literal at " + getErrorPos(Itr));
+      TokenList.push_back(std::make_unique<String>(Word, getPos(WordBegin)));
     } else if (Keyword::isPunctChar(Peek)) {
       std::string Word { Peek };
       auto SubItr = Itr;
@@ -93,18 +105,8 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
         ++Itr;
         --Len;
       }
-    } else if (Peek == '\"') {
-      std::string Word = "";
-      ++Itr;
-      while (Itr != Buffer.cend() && *Itr != '\"') {
-        Word += *Itr;
-        ++Itr;
-      }
-      if (Itr == Buffer.cend())
-        throw ParserException("Incomplete literal at " + getErrorPos(Itr));
-      TokenList.push_back(std::make_unique<String>(Word, getPos(WordBegin)));
     } else {
-      throw ParserException("Invalid characher at " + getErrorPos(Itr));
+      throw ParserException("Invalid characher at " + getErrorPos(Itr) + ": " + Peek);
     }
   }
 }

@@ -14,6 +14,7 @@ file(GLOB_RECURSE ALL_SOURCES
   source/analysis/Token.cpp
   source/analysis/LexicalAnalyzer.cpp
   source/analysis/SyntaxAnalyzer.cpp
+  source/analysis/Interpreter.cpp
   source/test/*.cpp
 )
 

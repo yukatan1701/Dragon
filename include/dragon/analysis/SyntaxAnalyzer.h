@@ -35,6 +35,7 @@ class SyntaxAnalyzer {
 public:
   typedef std::map<std::string, Function> FuncMap;
   SyntaxAnalyzer(const LexicalAnalyzer &LA);
+  const FuncMap &getFuncMap() const { return mFuncMap; }
   void dump() const;
 private:
   void generatePostfix(const TokenPtrList &TL, Function &F);

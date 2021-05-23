@@ -15,12 +15,20 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
   auto generateNotGoto = [this](const PostfixList &PL)->
       std::vector<Token *> {
     auto NotPtr = mTmpTokens.emplace_back(
-        std::make_unique<Keyword>(Keyword::Kind::LOGICAL_NOT)).get();
+        std::make_unique<PrefixOperator>(Keyword::Kind::LOGICAL_NOT)).get();
     auto GotoPtr = mTmpTokens.emplace_back(
-        std::make_unique<Keyword>(Keyword::Kind::GOTO_BIN)).get();
+        std::make_unique<BinaryOperator>(Keyword::Kind::GOTO_BIN)).get();
     auto PosPtr = mTmpTokens.emplace_back(
         std::make_unique<IntConstant>(PL.size())).get();
     return { NotPtr, PosPtr, GotoPtr };
+  };
+  auto generateGoto = [this](const PostfixList &PL)->
+      std::vector<Token *> {
+    auto GotoPtr = mTmpTokens.emplace_back(
+        std::make_unique<PrefixOperator>(Keyword::Kind::GOTO_UN)).get();
+    auto PosPtr = mTmpTokens.emplace_back(
+        std::make_unique<IntConstant>(PL.size())).get();
+    return { PosPtr, GotoPtr };
   };
   std::stack<IfWhilePos> IfWhileStack;
   auto &PostfixList = F.getPostfixList();
@@ -28,14 +36,10 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
     auto &Line = PostfixList.emplace_back();
     std::stack<Token *> Stack;
     for (auto &TokenPtr : *Itr) {
-      if (dynamic_cast<Constant *>(TokenPtr) ||
-          dynamic_cast<String *>(TokenPtr)) {
+      if (dynamic_cast<Constant *>(TokenPtr)) {
         Line.push_back(TokenPtr);
       } else if (auto Id = dynamic_cast<Identifier *>(TokenPtr)) {
-        if (isFunction(Id))
-          Stack.push(Id);
-        else
-          Line.push_back(Id);
+        Line.push_back(Id);
       } else if (auto Pref = dynamic_cast<PrefixOperator *>(TokenPtr)) {
         if (Pref->getKind() == Keyword::Kind::COMMA) {
           bool HasLeftBr = false;
@@ -78,6 +82,10 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
             auto NotGotoList = generateNotGoto(PostfixList);
             PostfixList[IfPos].insert(PostfixList[IfPos].end(),
                                       NotGotoList.begin(), NotGotoList.end());
+          } else {
+            auto GotoList = generateGoto(PostfixList);
+            PostfixList[IfPos-1].insert(PostfixList[IfPos-1].end(),
+                                        GotoList.begin(), GotoList.end());
           }
           IfWhileStack.pop();
         } else if (Pref->getKind() == Keyword::Kind::ENDWHILE) {
@@ -91,7 +99,7 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
           PostfixList[WhilePos].insert(PostfixList[WhilePos].end(),
                                        NotGotoList.begin(), NotGotoList.end());
           auto GotoPtr = mTmpTokens.emplace_back(
-              std::make_unique<Keyword>(Keyword::Kind::GOTO_UN)).get();
+              std::make_unique<PrefixOperator>(Keyword::Kind::GOTO_UN)).get();
           auto PosPtr = mTmpTokens.emplace_back(
               std::make_unique<IntConstant>(WhilePos)).get();
           Line.push_back(PosPtr);
@@ -122,10 +130,9 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
               throw SyntaxException("Bracket mismatch at " + Br->getPos());
             else
               Stack.pop();
-            auto Id = dynamic_cast<Identifier *>(Stack.top());
-            if (Id && isFunction(Id)) {
-              Line.push_back(Stack.top());
-              Stack.pop();
+            auto Id = dynamic_cast<Identifier *>(Line.back());
+            if (Id != nullptr && !isFunction(Id)) {
+              // throw SyntaxException("This function does not exist at " + Br->getPos());
             }
           }
         }
