@@ -8,6 +8,7 @@ typedef SyntaxAnalyzer::FuncMap FuncMap;
 
 void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
   typedef std::pair<Keyword *, std::size_t> IfWhilePos;
+  typedef std::vector<Token *>::const_iterator TokenIterator;
   // TODO: square brackets
   auto isFunction = [this](const Identifier *Id) {
     return mFuncMap.find(Id->getName()) != mFuncMap.end();
@@ -35,16 +36,38 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
   for (auto Itr = TL.begin(); Itr != TL.end(); ++Itr) {
     auto &Line = PostfixList.emplace_back();
     std::stack<Token *> Stack;
-    for (auto &TokenPtr : *Itr) {
+    std::stack<std::pair<unsigned, TokenIterator>> ArgCountStack;
+    for (auto TokenItr = Itr->begin(); TokenItr != Itr->end(); ++TokenItr) {
+      auto &TokenPtr = *TokenItr;
       if (dynamic_cast<Constant *>(TokenPtr)) {
         Line.push_back(TokenPtr);
       } else if (auto Id = dynamic_cast<Identifier *>(TokenPtr)) {
-        if (isFunction(Id))
+        if (isFunction(Id)) {
           Stack.push(Id);
-        else
+          auto Next = std::next(TokenItr);
+          if (Next != Itr->end()) {
+            if (auto LeftPar = dynamic_cast<Bracket *>(*Next); LeftPar &&
+                LeftPar->getKind() == Keyword::Kind::LEFT_PARENTHESIS) {
+              DRAGON_DEBUG(dbgs() << "[SYNTAX ANALYZER] Initialize function "
+                  "call info stack for function `" << Id->toString() << "`\n");
+              ArgCountStack.push(std::make_pair(0, Next));
+            } else {
+              throw SyntaxException("'(' expected after function call");
+            }
+          } else {
+            throw SyntaxException("'(' expected after function call");
+          }
+        } else {
           Line.push_back(Id);
+        }
       } else if (auto Pref = dynamic_cast<PrefixOperator *>(TokenPtr)) {
         if (Pref->getKind() == Keyword::Kind::COMMA) {
+          if (ArgCountStack.empty())
+            throw SyntaxException("No function call for comma.");
+          if (std::next(ArgCountStack.top().second) == TokenItr)
+            throw SyntaxException("Empty argument of function call.");
+          ++ArgCountStack.top().first;
+          ArgCountStack.top().second = TokenItr;
           bool HasLeftBr = false;
           while (!Stack.empty()) {
             if (auto Kw = dynamic_cast<Bracket *>(Stack.top());
@@ -135,8 +158,30 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
               Stack.pop();
             if (!Stack.empty()) {
               if (auto Id = dynamic_cast<Identifier *>(Stack.top())) {
-                if (isFunction(Id))
+                if (isFunction(Id)) {
+                  if (ArgCountStack.empty())
+                    throw SyntaxException("No function call for ')'");
+                  auto &ArgInfo = ArgCountStack.top();
+                  if (std::next(ArgInfo.second) == TokenItr) {
+                    if (ArgInfo.first > 0)
+                      throw SyntaxException("Empty argument of function call");
+                  } else {
+                    ++ArgInfo.first;
+                  }
+                  ArgInfo.second = TokenItr;
+                  auto ExpectedParamCount = mFuncMap.find(Id->getName())->
+                      second.getParamList().size();
+                  DRAGON_DEBUG(dbgs() << "[SYNTAX ANALYZER] Expected/real "
+                      "argument count for function `" << Id->getName() <<
+                      "`: " << ExpectedParamCount << "/" << ArgInfo.first <<
+                      "\n");
+                  if (ExpectedParamCount < ArgInfo.first)
+                    throw SyntaxException("Too many arguments for function");
+                  if (ExpectedParamCount > ArgInfo.first)
+                    throw SyntaxException("Too few arguments for function");
                   Line.push_back(Id);
+                  ArgCountStack.pop();
+                }
                 else
                   throw SyntaxException("This function does not exist at " +
                                         Br->getPos());
