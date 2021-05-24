@@ -19,5 +19,3 @@ function main()
 	endwhile
 	return
 	
-x = y - 8
-y = 7 + 14

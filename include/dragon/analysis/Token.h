@@ -264,7 +264,7 @@ public:
   bool getValue() { return mValue; }
   bool setValue(bool Value) { mValue = Value; return mValue; }
   std::string toString() const {
-    return "<bool: " + std::to_string(mValue) + ">";
+    return "<bool: " + std::string(mValue == true ? "true" : "false") + ">";
   }
 
   static bool isBoolean(const std::string &Str) {

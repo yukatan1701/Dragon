@@ -63,10 +63,10 @@ void Interpreter::processUnary(const PrefixOperator *Op, Token *Top) {
   } else if (auto Bool = dynamic_cast<Boolean *>(Top)) {
     switch (Op->getKind()) {
     case Kind::PRINTLN:
-      std::cout << Bool->getValue() << "\n";
+      std::cout << (Bool->getValue() ? "true" : "false")  << "\n";
       break;
     case Kind::PRINT:
-      std::cout << Bool->getValue();
+      std::cout << (Bool->getValue() ? "true" : "false");
       break;
     case Kind::LOGICAL_NOT:
       Bool->setValue(!Bool->getValue());
@@ -235,11 +235,11 @@ Token *Interpreter::processBinary(
       else if (OpKind == Kind::GEQ)
         return new Boolean(Int1->getValue() >= F2->getValue());
       else if (OpKind == Kind::PLUS)
-        return new IntConstant(Int1->getValue() + F2->getValue());
+        return new FloatConstant(Int1->getValue() + F2->getValue());
       else if (OpKind == Kind::MINUS)
-        return new IntConstant(Int1->getValue() - F2->getValue());
+        return new FloatConstant(Int1->getValue() - F2->getValue());
       else if (OpKind == Kind::MULTIPLY)
-        return new IntConstant(Int1->getValue() * F2->getValue());
+        return new FloatConstant(Int1->getValue() * F2->getValue());
       else if (OpKind == Kind::DIVIDE)
         return new FloatConstant(Int1->getValue() / double(F2->getValue()));
       assert(0);
@@ -258,11 +258,11 @@ Token *Interpreter::processBinary(
       else if (OpKind == Kind::GEQ)
         return new Boolean(F1->getValue() >= Int2->getValue());
       else if (OpKind == Kind::PLUS)
-        return new IntConstant(F1->getValue() + Int2->getValue());
+        return new FloatConstant(F1->getValue() + Int2->getValue());
       else if (OpKind == Kind::MINUS)
-        return new IntConstant(F1->getValue() - Int2->getValue());
+        return new FloatConstant(F1->getValue() - Int2->getValue());
       else if (OpKind == Kind::MULTIPLY)
-        return new IntConstant(F1->getValue() * Int2->getValue());
+        return new FloatConstant(F1->getValue() * Int2->getValue());
       else if (OpKind == Kind::DIVIDE)
         return new FloatConstant(F1->getValue() / double(Int2->getValue()));
       assert(0);

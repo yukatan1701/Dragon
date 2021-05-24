@@ -6,6 +6,7 @@
 
 # void function with one parameter
 function printvalue(x)
+	print "value: "
 	println x
 	return
 
