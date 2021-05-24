@@ -39,13 +39,16 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
       if (dynamic_cast<Constant *>(TokenPtr)) {
         Line.push_back(TokenPtr);
       } else if (auto Id = dynamic_cast<Identifier *>(TokenPtr)) {
-        Line.push_back(Id);
+        if (isFunction(Id))
+          Stack.push(Id);
+        else
+          Line.push_back(Id);
       } else if (auto Pref = dynamic_cast<PrefixOperator *>(TokenPtr)) {
         if (Pref->getKind() == Keyword::Kind::COMMA) {
           bool HasLeftBr = false;
           while (!Stack.empty()) {
             if (auto Kw = dynamic_cast<Bracket *>(Stack.top());
-                Kw->getKind() == Keyword::Kind::LEFT_PARENTHESIS) {
+                Kw && Kw->getKind() == Keyword::Kind::LEFT_PARENTHESIS) {
               HasLeftBr = true;
               break;
             }
@@ -130,9 +133,15 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
               throw SyntaxException("Bracket mismatch at " + Br->getPos());
             else
               Stack.pop();
-            auto Id = dynamic_cast<Identifier *>(Line.back());
-            if (Id != nullptr && !isFunction(Id)) {
-              // throw SyntaxException("This function does not exist at " + Br->getPos());
+            if (!Stack.empty()) {
+              if (auto Id = dynamic_cast<Identifier *>(Stack.top())) {
+                if (isFunction(Id))
+                  Line.push_back(Id);
+                else
+                  throw SyntaxException("This function does not exist at " +
+                                        Br->getPos());
+                Stack.pop();
+              }
             }
           }
         }
@@ -164,8 +173,10 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
         throw SyntaxException("Unexpected token at " + TokenPtr->getPos());
       }
     }
+    DRAGON_DEBUG(dbgs() << "[SYNTAX ANALYZER] In stack after line processing:\n");
     while (!Stack.empty()) {
-      if (!dynamic_cast<Keyword *>(Stack.top())) {
+      DRAGON_DEBUG(dbgs() << Stack.top()->toString() << "\n");
+      if (dynamic_cast<Bracket *>(Stack.top())) {
         throw SyntaxException("Parenthesis mismatch");
       }
       Line.push_back(Stack.top());

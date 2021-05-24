@@ -352,10 +352,9 @@ bool Interpreter::run(const Function &F) {
         } else {
           auto ParamCount = FuncItr->second.getParamList().size();
           for (std::size_t I = 0; I < ParamCount; ++I) {
-            auto NextItr = std::next(Itr);
-            if (NextItr == PL[Idx].end())
+            if (Stack.empty())
               throw InterpreterException("Not enough arguments");
-            auto ArgToken = *NextItr;
+            auto ArgToken = Stack.top();
             Constant *ConstValue = nullptr;
             if (auto Id = dynamic_cast<Identifier *>(ArgToken)) {
               auto VarItr = getVarItr(Id);
@@ -366,7 +365,7 @@ bool Interpreter::run(const Function &F) {
               throw InterpreterException("Invalid argument type");
             }
             mCallStack.push(ConstValue);
-            ++Itr;
+            Stack.pop();
           }
           auto HasReturned = callFunction(FuncItr->second.getName());
           if (HasReturned) {
