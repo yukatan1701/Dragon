@@ -9,21 +9,22 @@
 
 #define KEYPAIR(x, y) std::make_pair(x, y)
 
-typedef std::pair<std::size_t, std::size_t> PosInfo;
+typedef unsigned long PosType;
+typedef std::pair<PosType, PosType> PosInfo;
 
 class Token {
 public:
   Token() {}
-  Token(const PosInfo &LineCol)
-      : mLine(LineCol.first), mColumn(LineCol.second) {}
-  Token(std::size_t Line, std::size_t Column) : mLine(Line), mColumn(Column) {}
+  Token(const PosInfo &LineCol) : mPI(LineCol) {}
+  Token(PosType Line, PosType Column) : mPI(Line, Column) {}
   virtual std::string toString() const { return "<unknown token>"; }
-  std::string getPos() const { return std::to_string(mLine) + ":" +
-                                      std::to_string(mColumn); }
+  std::string getPos() const { return std::to_string(mPI.first) + ":" +
+                                      std::to_string(mPI.second); }
+  const PosInfo &getPosInfo() const { return mPI; }
   virtual Token *clone() const { return new Token(); }
   virtual ~Token() {}
 protected:
-  std::size_t mLine, mColumn;
+  PosInfo mPI;
 };
 
 class Word : public Token {
@@ -42,7 +43,6 @@ public:
     FUNCTION = 0,
     COLON,
     QUOTE,
-    GLOBAL,
 
     /* brackets */
     BRACKETS_BEGIN,
@@ -67,6 +67,7 @@ public:
     WHILE,
     ENDWHILE,
     GOTO_UN,
+    GLOBAL,
     UNARY_END,
 
     /* binary operators */
@@ -222,34 +223,34 @@ private:
   std::string mString;
 };
 
-class FloatConstant : public Constant {
+class Float : public Constant {
 public:
-  FloatConstant(double Value) : mValue(Value) {}
-  FloatConstant(double Value, const PosInfo &PI) : Constant(PI), mValue(Value) {}
+  Float(double Value) : mValue(Value) {}
+  Float(double Value, const PosInfo &PI) : Constant(PI), mValue(Value) {}
   double getValue() { return mValue; }
   double setValue(double Value) { mValue = Value; return mValue; }
   std::string toString() const {
     return "<float: " + std::to_string(mValue) + ">";
   }
-  Token *clone() const { return new FloatConstant(mValue); }
-  virtual Constant *cloneConst() const { return new FloatConstant(mValue); }
-  virtual ~FloatConstant() {}
+  Token *clone() const { return new Float(mValue); }
+  virtual Constant *cloneConst() const { return new Float(mValue); }
+  virtual ~Float() {}
 private:
   double mValue;
 };
 
-class IntConstant : public Constant {
+class Integer : public Constant {
 public:
-  IntConstant(int Value) : mValue(Value) {}
-  IntConstant(int Value, const PosInfo &PI) : Constant(PI), mValue(Value) {}
+  Integer(int Value) : mValue(Value) {}
+  Integer(int Value, const PosInfo &PI) : Constant(PI), mValue(Value) {}
   int getValue() { return mValue; }
   int setValue(int Value) { mValue = Value; return mValue; }
   std::string toString() const {
     return "<int: " + std::to_string(mValue) + ">";
   }
-  Token *clone() const { return new IntConstant(mValue); }
-  virtual Constant *cloneConst() const { return new IntConstant(mValue); }
-  virtual ~IntConstant() {}
+  Token *clone() const { return new Integer(mValue); }
+  virtual Constant *cloneConst() const { return new Integer(mValue); }
+  virtual ~Integer() {}
 private:
   int mValue;
 };

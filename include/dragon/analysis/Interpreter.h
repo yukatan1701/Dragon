@@ -24,15 +24,19 @@ public:
 private:
   typedef SyntaxAnalyzer::FuncMap FuncMap;
   typedef std::map<std::string, Constant *> VarTable;
+  typedef std::pair<VarTable::iterator, VarTable *> VarTableItrPair;
   const FuncMap &mFM;
   std::stack<Constant *> mCallStack;
-  std::stack<std::set<Token *>> mTmpTokens; 
+  std::deque<std::set<Token *>> mTmpTokens; 
   std::deque<VarTable> mVarTableStack;
+  std::deque<std::set<std::string>> mGlobVarSetStack;
+  std::stack<const Function *> mFuncStack;
 
   bool callFunction(const std::string &FName);
   void processUnary(const PrefixOperator *Op, Token *Top);
   void processAssign(Token *OpLeft, Token *OpRight);
   Token *processBinary(const BinaryOperator *Op, Token *OpLeft, Token *OpRight);
+  VarTableItrPair getVarItr(const Identifier *Id, bool Exception=true);
   bool run(const Function &F);
 };
 

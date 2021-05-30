@@ -5,20 +5,39 @@ typedef Keyword::Kind Kind;
 
 const double EPS = std::numeric_limits<double>::epsilon();
 
+Interpreter::VarTableItrPair Interpreter::getVarItr(
+      const Identifier *Id, bool Exception) {
+  auto &GlobVars = mGlobVarSetStack.front();
+  if (GlobVars.find(Id->getName()) != GlobVars.end() &&
+      mFuncStack.top()->getName() != GLOBAL_FUNC) {
+    auto &GlobVT = mVarTableStack.back();
+    auto GlobItr = GlobVT.find(Id->getName());
+    assert(GlobItr != GlobVT.end() &&
+        "Global variable must have an entry in a global table!");
+    return std::make_pair(GlobItr, &GlobVT);
+  }
+  auto &VT = mVarTableStack.front();
+  auto VarItr = VT.find(Id->getName());
+  if (VarItr == VT.end() && Exception)
+    throw InterpreterException("Variable with name `" +
+        Id->getName() + "` does not exist in this scope");
+  return std::make_pair(VarItr, &VT);
+}
+
 void Interpreter::processUnary(const PrefixOperator *Op, Token *Top) {
   DRAGON_DEBUG(dbgs() << "[RUNTIME] Processing unary operator `" <<
                Op->kindToString() << "` for token " << Top->toString() << ".\n");
   if (auto Id = dynamic_cast<Identifier *>(Top)) {
-    auto ConstItr = mVarTableStack.front().find(Id->getName());
-    if (ConstItr != mVarTableStack.front().end()) {
-      Top = ConstItr->second;
+    auto ConstItrPair = getVarItr(Id);
+    if (ConstItrPair.first != ConstItrPair.second->end()) {
+      Top = ConstItrPair.first->second;
     } else {
       throw InterpreterException("Variable with name `" + Id->getName() +
                                  "` does not exist in this scope at " +
                                  Op->getPos());
     }
   }
-  if (auto Int = dynamic_cast<IntConstant *>(Top)) {
+  if (auto Int = dynamic_cast<Integer *>(Top)) {
     switch (Op->getKind()) {
     case Kind::UNARY_MINUS:
       Int->setValue(-Int->getValue());
@@ -33,20 +52,20 @@ void Interpreter::processUnary(const PrefixOperator *Op, Token *Top) {
       throw InterpreterException("Unexpected unary operator for constant " +
                                  Int->getPos());
     }
-  } else if (auto Float = dynamic_cast<FloatConstant *>(Top)) {
+  } else if (auto FloatPtr = dynamic_cast<Float *>(Top)) {
     switch (Op->getKind()) {
     case Kind::UNARY_MINUS:
-      Float->setValue(-Float->getValue());
+      FloatPtr->setValue(-FloatPtr->getValue());
       break;
     case Kind::PRINTLN:
-      std::cout << Float->getValue() << "\n";
+      std::cout << FloatPtr->getValue() << "\n";
       break;
     case Kind::PRINT:
-      std::cout << Float->getValue();
+      std::cout << FloatPtr->getValue();
       break;
     default:
       throw InterpreterException("Unexpected unary operator for constant " +
-                                 Float->getPos());
+                                 FloatPtr->getPos());
     }
   } else if (auto Str = dynamic_cast<String *>(Top)) {
     switch (Op->getKind()) {
@@ -58,7 +77,7 @@ void Interpreter::processUnary(const PrefixOperator *Op, Token *Top) {
       break;
     default:
       throw InterpreterException("Unexpected unary operator for literal " +
-                                 Float->getPos());
+                                 FloatPtr->getPos());
     }
   } else if (auto Bool = dynamic_cast<Boolean *>(Top)) {
     switch (Op->getKind()) {
@@ -89,9 +108,9 @@ Token *Interpreter::processBinary(
                OpRightToken->toString() << ".\n");
   auto CheckIdentifier = [this, Op](Token *Operand)->Constant * {
     if (auto Id = dynamic_cast<Identifier *>(Operand)) {
-      auto ConstItr = mVarTableStack.front().find(Id->getName());
-      if (ConstItr != mVarTableStack.front().end())
-        return ConstItr->second;
+      auto ConstItrPair = getVarItr(Id);
+      if (ConstItrPair.first != ConstItrPair.second->end())
+        return ConstItrPair.first->second;
       throw InterpreterException("Variable with name `" + Id->getName() +
                                   "` does not exist in this scope at " +
                                   Op->getPos());
@@ -105,8 +124,8 @@ Token *Interpreter::processBinary(
   Constant *OpRight = CheckIdentifier(OpRightToken);
   DRAGON_DEBUG(dbgs() << "[RUNTIME] Got constant values: " <<
                OpLeft->toString() << " " << OpRight->toString() << "\n");
-  IntConstant *Int1, *Int2;
-  FloatConstant *F1, *F2;
+  Integer *Int1, *Int2;
+  Float *F1, *F2;
   Boolean *B1, *B2;
   String *S1, *S2;
   bool Res;
@@ -129,26 +148,26 @@ Token *Interpreter::processBinary(
   case Kind::SHL:
   case Kind::SHR:
   case Kind::MODULE:
-    Int1 = dynamic_cast<IntConstant *>(OpLeft);
-    Int2 = dynamic_cast<IntConstant *>(OpRight);
+    Int1 = dynamic_cast<Integer *>(OpLeft);
+    Int2 = dynamic_cast<Integer *>(OpRight);
     if (!Int1 || !Int2)
       throw InterpreterException("Type mismatch for bitwise operation.");
     if (OpKind == Kind::BITWISE_AND)
-      return new IntConstant(Int1->getValue() & Int2->getValue());
+      return new Integer(Int1->getValue() & Int2->getValue());
     else if (OpKind == Kind::BITWISE_OR)
-      return new IntConstant(Int1->getValue() | Int2->getValue());
+      return new Integer(Int1->getValue() | Int2->getValue());
     else if (OpKind == Kind::SHL)
-      return new IntConstant(Int1->getValue() << Int2->getValue());
+      return new Integer(Int1->getValue() << Int2->getValue());
     else if (OpKind == Kind::SHR)
-      return new IntConstant(Int1->getValue() >> Int2->getValue());
+      return new Integer(Int1->getValue() >> Int2->getValue());
     else if (OpKind == Kind::MODULE)
-      return new IntConstant(Int1->getValue() % Int2->getValue());
+      return new Integer(Int1->getValue() % Int2->getValue());
     else
-      return new IntConstant(Int1->getValue() ^ Int2->getValue());
+      return new Integer(Int1->getValue() ^ Int2->getValue());
     assert(0);
   default:
-    Int1 = dynamic_cast<IntConstant *>(OpLeft);
-    Int2 = dynamic_cast<IntConstant *>(OpRight);
+    Int1 = dynamic_cast<Integer *>(OpLeft);
+    Int2 = dynamic_cast<Integer *>(OpRight);
     if (Int1 && Int2) {
       if (OpKind == Kind::EQUAL)
         return new Boolean(Int1->getValue() == Int2->getValue());
@@ -163,17 +182,17 @@ Token *Interpreter::processBinary(
       else if (OpKind == Kind::GEQ)
         return new Boolean(Int1->getValue() >= Int2->getValue());
       else if (OpKind == Kind::PLUS)
-        return new IntConstant(Int1->getValue() + Int2->getValue());
+        return new Integer(Int1->getValue() + Int2->getValue());
       else if (OpKind == Kind::MINUS)
-        return new IntConstant(Int1->getValue() - Int2->getValue());
+        return new Integer(Int1->getValue() - Int2->getValue());
       else if (OpKind == Kind::MULTIPLY)
-        return new IntConstant(Int1->getValue() * Int2->getValue());
+        return new Integer(Int1->getValue() * Int2->getValue());
       else if (OpKind == Kind::DIVIDE)
-        return new FloatConstant(Int1->getValue() / double(Int2->getValue()));
+        return new Float(Int1->getValue() / double(Int2->getValue()));
       assert(0);
     }
-    F1 = dynamic_cast<FloatConstant *>(OpLeft);
-    F2 = dynamic_cast<FloatConstant *>(OpRight);
+    F1 = dynamic_cast<Float *>(OpLeft);
+    F2 = dynamic_cast<Float *>(OpRight);
     if (F1 && F2) {
       if (OpKind == Kind::EQUAL)
         return new Boolean(F1->getValue() == F2->getValue());
@@ -188,13 +207,13 @@ Token *Interpreter::processBinary(
       else if (OpKind == Kind::GEQ)
         return new Boolean(F1->getValue() >= F2->getValue());
       else if (OpKind == Kind::PLUS)
-        return new FloatConstant(F1->getValue() + F2->getValue());
+        return new Float(F1->getValue() + F2->getValue());
       else if (OpKind == Kind::MINUS)
-        return new FloatConstant(F1->getValue() - F2->getValue());
+        return new Float(F1->getValue() - F2->getValue());
       else if (OpKind == Kind::MULTIPLY)
-        return new FloatConstant(F1->getValue() * F2->getValue());
+        return new Float(F1->getValue() * F2->getValue());
       else if (OpKind == Kind::DIVIDE)
-        return new FloatConstant(F1->getValue() / F2->getValue());
+        return new Float(F1->getValue() / F2->getValue());
       assert(0);
     }
     S1 = dynamic_cast<String *>(OpLeft);
@@ -235,13 +254,13 @@ Token *Interpreter::processBinary(
       else if (OpKind == Kind::GEQ)
         return new Boolean(Int1->getValue() >= F2->getValue());
       else if (OpKind == Kind::PLUS)
-        return new FloatConstant(Int1->getValue() + F2->getValue());
+        return new Float(Int1->getValue() + F2->getValue());
       else if (OpKind == Kind::MINUS)
-        return new FloatConstant(Int1->getValue() - F2->getValue());
+        return new Float(Int1->getValue() - F2->getValue());
       else if (OpKind == Kind::MULTIPLY)
-        return new FloatConstant(Int1->getValue() * F2->getValue());
+        return new Float(Int1->getValue() * F2->getValue());
       else if (OpKind == Kind::DIVIDE)
-        return new FloatConstant(Int1->getValue() / double(F2->getValue()));
+        return new Float(Int1->getValue() / double(F2->getValue()));
       assert(0);
     }
     if (F1 && Int2) {
@@ -258,13 +277,13 @@ Token *Interpreter::processBinary(
       else if (OpKind == Kind::GEQ)
         return new Boolean(F1->getValue() >= Int2->getValue());
       else if (OpKind == Kind::PLUS)
-        return new FloatConstant(F1->getValue() + Int2->getValue());
+        return new Float(F1->getValue() + Int2->getValue());
       else if (OpKind == Kind::MINUS)
-        return new FloatConstant(F1->getValue() - Int2->getValue());
+        return new Float(F1->getValue() - Int2->getValue());
       else if (OpKind == Kind::MULTIPLY)
-        return new FloatConstant(F1->getValue() * Int2->getValue());
+        return new Float(F1->getValue() * Int2->getValue());
       else if (OpKind == Kind::DIVIDE)
-        return new FloatConstant(F1->getValue() / double(Int2->getValue()));
+        return new Float(F1->getValue() / double(Int2->getValue()));
       assert(0);
     }
     throw InterpreterException("Some type mismatch expected.");
@@ -274,7 +293,7 @@ Token *Interpreter::processBinary(
 
 void processBinaryGoto(Token *OpLeft, Token *OpRight, std::size_t &Idx) {
   if (auto Bool = dynamic_cast<Boolean *>(OpLeft)) {
-    if (auto Int = dynamic_cast<IntConstant *>(OpRight)) {
+    if (auto Int = dynamic_cast<Integer *>(OpRight)) {
       if (Bool->getValue()) {
         Idx = Int->getValue() - 1;
       }
@@ -292,34 +311,36 @@ void Interpreter::processAssign(Token *OpLeft, Token *OpRight) {
   DRAGON_DEBUG(dbgs() << "[RUNTIME] Processing assignment for tokens: " <<
                OpLeft->toString() << ", " << OpRight->toString() << ".\n");
   if (auto Id = dynamic_cast<Identifier *>(OpLeft)) {
-    auto &VarTable = mVarTableStack.front();
-    auto Itr = VarTable.find(Id->getName());
+    auto ItrPair = getVarItr(Id, false);
     Constant **Value = nullptr;
-    if (Itr == VarTable.end()) {
+    if (ItrPair.first == ItrPair.second->end()) {
       DRAGON_DEBUG(
           dbgs() << "[RUNTIME] Create new table entry for left operand.\n");
-      Value = &VarTable.insert(std::make_pair(
+      Value = &ItrPair.second->insert(std::make_pair(
           Id->getName(), nullptr)).first->second;
     } else {
       DRAGON_DEBUG(
           dbgs() << "[RUNTIME] Use existing table entry for left operand.\n");
-      Value = &Itr->second;
+      Value = &ItrPair.first->second;
     }
     if (auto ConstRight = dynamic_cast<Constant *>(OpRight)) {
       *Value = ConstRight->cloneConst();
     } else if (auto IdRight = dynamic_cast<Identifier *>(OpRight)) {
-      auto RightItr = VarTable.find(IdRight->getName());
-      if (RightItr == VarTable.end())
+      auto RightItr = getVarItr(IdRight);
+      if (RightItr.first == RightItr.second->end())
         throw InterpreterException("Failed to read variable `" + IdRight->getName() +
                                    "` at " + OpLeft->getPos());
-      *Value = RightItr->second->cloneConst();
+      *Value = RightItr.first->second->cloneConst();
     } else {
       throw InterpreterException("Non-constant right expression at " +
                                 OpLeft->getPos());
     }
     DRAGON_DEBUG(dbgs() << "[RUNTIME] New token for a value of left operand: " <<
                  (*Value)->toString() << "\n");
-    mTmpTokens.top().insert(*Value);
+    if (ItrPair.second == &mVarTableStack.back())
+      mTmpTokens.back().insert(*Value);
+    else
+      mTmpTokens.front().insert(*Value);
   } else {
     throw InterpreterException("R-value error at " +
                                 OpLeft->getPos());
@@ -327,14 +348,6 @@ void Interpreter::processAssign(Token *OpLeft, Token *OpRight) {
 }
 
 bool Interpreter::run(const Function &F) {
-  auto getVarItr = [this](const Identifier *Id) {
-    auto &VT = mVarTableStack.front();
-    auto VarItr = VT.find(Id->getName());
-    if (VarItr == VT.end())
-      throw InterpreterException("Variable with name `" +
-          Id->getName() + "` does not exist in this scope");
-    return VarItr;
-  };
   auto &PL = F.getPostfixList();
   for (std::size_t Idx = 0; Idx < PL.size(); ++Idx) {
     std::stack<Token *> Stack;
@@ -358,7 +371,9 @@ bool Interpreter::run(const Function &F) {
             Constant *ConstValue = nullptr;
             if (auto Id = dynamic_cast<Identifier *>(ArgToken)) {
               auto VarItr = getVarItr(Id);
-              ConstValue = VarItr->second->cloneConst();
+              DRAGON_DEBUG(dbgs() << "[RUNTIME] Add variable to call stack: "
+                           << VarItr.first->second->toString() << "\n");
+              ConstValue = VarItr.first->second->cloneConst();
             } else if (auto Const = dynamic_cast<Constant *>(ArgToken)) {
               ConstValue = Const->cloneConst();
             } else {
@@ -370,7 +385,7 @@ bool Interpreter::run(const Function &F) {
           auto HasReturned = callFunction(FuncItr->second.getName());
           if (HasReturned) {
             auto RetConst = mCallStack.top();
-            mTmpTokens.top().insert(RetConst);
+            mTmpTokens.front().insert(RetConst);
             Stack.push(RetConst);
           }
         }
@@ -379,6 +394,23 @@ bool Interpreter::run(const Function &F) {
           throw InterpreterException("Unexpected unary operator at " +
                                      Kw->getPos());
         if (auto Unary = dynamic_cast<PrefixOperator *>(Kw)) {
+          if (Unary->getKind() == Kind::GLOBAL) {
+            if (Stack.empty())
+              throw InterpreterException("Not enough arguments for `global` at "
+                                         + Unary->getPos());
+            auto Id = dynamic_cast<Identifier *>(Stack.top());
+            if (!Id)
+              throw InterpreterException("Not an identifier after `global` at "
+                                         + Unary->getPos());
+            auto &GlobalTable = mVarTableStack.back();
+            auto GlobItr = GlobalTable.find(Id->getName());
+            if (GlobItr == GlobalTable.end())
+              throw InterpreterException("Failed to find global variable at "
+                                         + Unary->getPos());
+            mGlobVarSetStack.front().insert(Id->getName());
+            Stack.pop();
+            continue;
+          }
           if (Unary->getKind() == Kind::RETURN) {
             if (Stack.empty()) {
               return false;
@@ -386,7 +418,7 @@ bool Interpreter::run(const Function &F) {
               auto Top = Stack.top();
               Constant *RetConst = nullptr;
               if (auto Id = dynamic_cast<Identifier *>(Top)) {
-                RetConst = getVarItr(Id)->second->cloneConst();
+                RetConst = getVarItr(Id).first->second->cloneConst();
               } else if (auto Const = dynamic_cast<Constant *>(Top)) {
                 RetConst = Const->cloneConst();
               } else {
@@ -397,7 +429,7 @@ bool Interpreter::run(const Function &F) {
               return true;
             }
           } else if (Unary->getKind() == Kind::GOTO_UN) {
-            if (auto Int = dynamic_cast<IntConstant *>(Stack.top())) {
+            if (auto Int = dynamic_cast<Integer *>(Stack.top())) {
               Idx = Int->getValue() - 1;
             } else {
               throw InterpreterException("Non-integer goto found");
@@ -421,7 +453,7 @@ bool Interpreter::run(const Function &F) {
           } else {
             auto Res = processBinary(Binary, OpLeft, OpRight);
             Stack.pop();
-            mTmpTokens.top().insert(Res);
+            mTmpTokens.front().insert(Res);
             Stack.push(Res);
           }
         } else {
@@ -437,6 +469,7 @@ bool Interpreter::run(const Function &F) {
 }
 
 bool Interpreter::callFunction(const std::string &FName) {
+  DRAGON_DEBUG(dbgs() << "[RUNTIME] Entering function `" << FName << "`.\n");
   auto Itr = mFM.find(FName);
   if (Itr == mFM.end())
     throw InterpreterException("Function with name `" + FName +
@@ -447,7 +480,8 @@ bool Interpreter::callFunction(const std::string &FName) {
     throw InterpreterException("Not enough arguments for function `" + FName +
                                "`.");
   auto &VarTable = mVarTableStack.emplace_front();
-  auto &CurTmp = mTmpTokens.emplace();
+  auto &CurTmp = mTmpTokens.emplace_front();
+  mGlobVarSetStack.emplace_front();
   for (auto Itr = ParamList.rbegin(); Itr != ParamList.rend(); ++Itr) {
     auto ParamConst = mCallStack.top()->cloneConst();
     CurTmp.insert(ParamConst);
@@ -455,13 +489,19 @@ bool Interpreter::callFunction(const std::string &FName) {
     delete mCallStack.top();
     mCallStack.pop();
   }
+  mFuncStack.push(&Func);
   auto HasReturned = run(Func);
-  if (!mTmpTokens.empty()) {
-    for (auto Ptr : mTmpTokens.top())
-      delete Ptr;
-    mTmpTokens.pop();
+  if (FName != GLOBAL_FUNC) {
+    if (!mTmpTokens.empty()) {
+      for (auto Ptr : mTmpTokens.front())
+        delete Ptr;
+      mTmpTokens.pop_front();
+    }
+    mVarTableStack.pop_front();
+    mGlobVarSetStack.pop_front();
   }
-  mVarTableStack.pop_front();
+  mFuncStack.pop();
+  DRAGON_DEBUG(dbgs() << "[RUNTIME] Leaving function `" << FName << "`.\n");
   return HasReturned;
 }
 
@@ -475,8 +515,8 @@ Interpreter::Interpreter(const SyntaxAnalyzer &SA) : mFM(SA.getFuncMap()) {
 
 Interpreter::~Interpreter() {
   while (!mTmpTokens.empty()) {
-    for (auto Ptr : mTmpTokens.top())
+    for (auto Ptr : mTmpTokens.front())
       delete Ptr;
-    mTmpTokens.pop();
+    mTmpTokens.pop_front();
   }
 }

@@ -15,9 +15,9 @@ file(GLOB_RECURSE ALL_SOURCES
   source/analysis/LexicalAnalyzer.cpp
   source/analysis/SyntaxAnalyzer.cpp
   source/analysis/Interpreter.cpp
-  source/test/*.cpp
+  source/Dragon.cpp
 )
 
-add_executable(test_parser ${ALL_SOURCES})
+add_executable(dragon ${ALL_SOURCES})
 
 

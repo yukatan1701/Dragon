@@ -3,16 +3,16 @@
 #include <fstream>
 
 int main(int argc, char **argv) {
-  std::cout << std::endl;
+  std::cout << "DRAGON 1.0 is running." << std::endl;
   if (argc < 2) {
-    DRAGON_DEBUG(dbgs() << "Too few arguments.\n");
+    std::cerr << "Too few arguments. Please enter a filename." << std::endl;
     return -1;
   }
   auto Filename = argv[1];
   std::ifstream File;
   File.open(Filename, std::ios::in);
   if (!File.is_open()) {
-    DRAGON_DEBUG(dbgs() << "Failed to open file `" << Filename << "`.\n");
+    std::cerr << "Failed to open file `" << Filename << "`." << std::endl;
     return -1;
   }
   try {
@@ -20,10 +20,8 @@ int main(int argc, char **argv) {
     SyntaxAnalyzer SA(LA);
     Interpreter Int(SA);
   } catch (std::exception &E) {
-    DRAGON_DEBUG(dbgs() << "Exception occured:\n");
-    DRAGON_DEBUG(dbgs() << E.what());
+    std::cerr << E.what() << std::endl;
   }
   File.close();
-  
   return 0;
 }

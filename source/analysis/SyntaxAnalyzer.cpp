@@ -10,8 +10,9 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
   typedef std::pair<Keyword *, std::size_t> IfWhilePos;
   typedef std::vector<Token *>::const_iterator TokenIterator;
   // TODO: square brackets
-  auto isFunction = [this](const Identifier *Id) {
-    return mFuncMap.find(Id->getName()) != mFuncMap.end();
+  auto isFunction = [this, &F](const Identifier *Id) {
+    return mFuncMap.find(Id->getName()) != mFuncMap.end() ||
+           F.getName() == Id->getName();
   };
   auto generateNotGoto = [this](const PostfixList &PL)->
       std::vector<Token *> {
@@ -20,7 +21,7 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
     auto GotoPtr = mTmpTokens.emplace_back(
         std::make_unique<BinaryOperator>(Keyword::Kind::GOTO_BIN)).get();
     auto PosPtr = mTmpTokens.emplace_back(
-        std::make_unique<IntConstant>(PL.size())).get();
+        std::make_unique<Integer>(PL.size())).get();
     return { NotPtr, PosPtr, GotoPtr };
   };
   auto generateGoto = [this](const PostfixList &PL)->
@@ -28,7 +29,7 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
     auto GotoPtr = mTmpTokens.emplace_back(
         std::make_unique<PrefixOperator>(Keyword::Kind::GOTO_UN)).get();
     auto PosPtr = mTmpTokens.emplace_back(
-        std::make_unique<IntConstant>(PL.size())).get();
+        std::make_unique<Integer>(PL.size())).get();
     return { PosPtr, GotoPtr };
   };
   std::stack<IfWhilePos> IfWhileStack;
@@ -61,7 +62,21 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
           Line.push_back(Id);
         }
       } else if (auto Pref = dynamic_cast<PrefixOperator *>(TokenPtr)) {
-        if (Pref->getKind() == Keyword::Kind::COMMA) {
+        if (Pref->getKind() == Keyword::Kind::GLOBAL) {
+          auto Next = std::next(TokenItr);
+          if (TokenItr != Itr->begin() || Next == Itr->end())
+            throw SyntaxException("Syntax error at " + TokenPtr->getPos());
+          auto NextId = dynamic_cast<Identifier *>(*Next);
+          if (!NextId)
+            throw SyntaxException("Identifier expected after `global` at " +
+                                  TokenPtr->getPos());
+          if (std::next(Next) != Itr->end())
+            throw SyntaxException("Too many tokens after `global` at " +
+                                  TokenPtr->getPos());
+          Line.push_back(NextId);
+          Line.push_back(TokenPtr);
+          break;
+        } if (Pref->getKind() == Keyword::Kind::COMMA) {
           if (ArgCountStack.empty())
             throw SyntaxException("No function call for comma.");
           if (std::next(ArgCountStack.top().second) == TokenItr)
@@ -127,7 +142,7 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
           auto GotoPtr = mTmpTokens.emplace_back(
               std::make_unique<PrefixOperator>(Keyword::Kind::GOTO_UN)).get();
           auto PosPtr = mTmpTokens.emplace_back(
-              std::make_unique<IntConstant>(WhilePos)).get();
+              std::make_unique<Integer>(WhilePos)).get();
           Line.push_back(PosPtr);
           Line.push_back(GotoPtr);
           IfWhileStack.pop();
@@ -169,8 +184,13 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
                     ++ArgInfo.first;
                   }
                   ArgInfo.second = TokenItr;
-                  auto ExpectedParamCount = mFuncMap.find(Id->getName())->
-                      second.getParamList().size();
+                  std::size_t ExpectedParamCount = 0;
+                  if (Id->getName() == F.getName()) {
+                    ExpectedParamCount = F.getParamList().size();
+                  } else {
+                    ExpectedParamCount = mFuncMap.find(Id->getName())->
+                        second.getParamList().size();
+                  }
                   DRAGON_DEBUG(dbgs() << "[SYNTAX ANALYZER] Expected/real "
                       "argument count for function `" << Id->getName() <<
                       "`: " << ExpectedParamCount << "/" << ArgInfo.first <<
@@ -191,6 +211,29 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
           }
         }
       } else if (auto Bin = dynamic_cast<BinaryOperator *>(TokenPtr)) {
+        if (Bin->getKind() == Keyword::Kind::MINUS ||
+            Bin->getKind() == Keyword::Kind::PLUS) {
+          auto PrevToken = std::prev(TokenItr);
+          if (TokenItr == Itr->begin() ||
+              (!dynamic_cast<Identifier *>(*PrevToken) &&
+              !dynamic_cast<Constant *>(*PrevToken) &&
+              !(dynamic_cast<Bracket *>(*PrevToken) &&
+              dynamic_cast<Bracket *>(*PrevToken)->getKind() ==
+              Keyword::Kind::RIGHT_PARENTHESIS))) {
+            Token *UnaryPtr = nullptr;
+            if (Bin->getKind() == Keyword::Kind::MINUS) {
+              UnaryPtr = mTmpTokens.emplace_back(
+                  std::make_unique<PrefixOperator>(Keyword::Kind::UNARY_MINUS,
+                  Bin->getPosInfo())).get();
+            } else {
+              UnaryPtr = mTmpTokens.emplace_back(
+                  std::make_unique<PrefixOperator>(
+                  Keyword::Kind::UNARY_PLUS, Bin->getPosInfo())).get();
+            }
+            Stack.push(UnaryPtr);
+            continue;
+          }
+        }
         while (!Stack.empty()) {
           auto Kw = dynamic_cast<Keyword *>(Stack.top());
           assert(Kw && "Stack must contain keyword only!");

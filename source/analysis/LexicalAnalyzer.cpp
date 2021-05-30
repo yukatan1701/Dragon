@@ -23,7 +23,8 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
     auto ColN = Itr.getPtr() - Buffer.cbegin().getPtr() + 1;
     return std::make_pair(mLineN, ColN);
   };
-  auto getErrorPos = [this, &Buffer, &getPos](const CharBuffer::ConstIterator &Itr) {
+  auto getErrorPos = [this, &Buffer, &getPos](
+      const CharBuffer::ConstIterator &Itr) {
     auto Pos = getPos(Itr);
     return std::to_string(Pos.first) + ":" + std::to_string(Pos.second);
   };
@@ -31,7 +32,6 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
   for (auto Itr = Buffer.cbegin(); Itr != Buffer.cend(); ++Itr) {
     auto WordBegin = Itr;
     auto &Peek = *Itr;
-    //DRAGON_DEBUG(dbgs() << "[PARSER] Current char: " << Peek << "\n");
     if (std::isspace(Peek))
       continue;
     if (std::isdigit(Peek)) {
@@ -51,10 +51,10 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
       if (NumStr[0] == '.' && NumStr.size() == 1)
         throw ParserException("Invalid number format at " + getErrorPos(Itr));
       if (NumStr.find('.') == std::string::npos)
-        TokenList.push_back(std::make_unique<IntConstant>(std::stoi(NumStr),
+        TokenList.push_back(std::make_unique<Integer>(std::stoi(NumStr),
                             getPos(WordBegin)));
       else
-        TokenList.push_back(std::make_unique<FloatConstant>(std::stod(NumStr),
+        TokenList.push_back(std::make_unique<Float>(std::stod(NumStr),
                             getPos(WordBegin)));
     } else if (std::isalpha(Peek) || Peek == '_') {
       std::string Word { Peek };
@@ -106,7 +106,8 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
         --Len;
       }
     } else {
-      throw ParserException("Invalid characher at " + getErrorPos(Itr) + ": " + Peek);
+      throw ParserException("Invalid characher at " + getErrorPos(Itr) +
+                            ": " + Peek);
     }
   }
 }

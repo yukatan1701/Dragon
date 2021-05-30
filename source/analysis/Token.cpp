@@ -41,6 +41,8 @@ const Bimap<Keyword::Kind, std::string> Keyword::mKindToName = {
   KEYPAIR(Keyword::QUOTE, "\""),
   KEYPAIR(Keyword::GOTO_BIN, "goto"),
   KEYPAIR(Keyword::GOTO_UN, "goto*"),
+  KEYPAIR(Keyword::UNARY_MINUS, "-$"),
+  KEYPAIR(Keyword::UNARY_PLUS, "+$"),
   KEYPAIR(Keyword::GLOBAL, "global")
 };
 
@@ -58,7 +60,7 @@ const std::map<Keyword::Kind, Keyword::Priority> Keyword::mKindToPriority = {
   KEYPAIR(Keyword::QUOTE, -1),
   KEYPAIR(Keyword::GOTO_BIN, 101),
   KEYPAIR(Keyword::GOTO_UN, 101),
-  KEYPAIR(Keyword::GLOBAL, -1),
+  KEYPAIR(Keyword::GLOBAL, 100),
 
   KEYPAIR(Keyword::LEFT_PARENTHESIS, 1),
   KEYPAIR(Keyword::RIGHT_PARENTHESIS, 1),
