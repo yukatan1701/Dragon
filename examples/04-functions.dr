@@ -2,7 +2,9 @@
 # Write 'function' word to define a function.
 # Use parentheses and commas to define parameters.
 # Use 'return' word (with or without answer) to leave the function.
-# Be sure to write 'global' word because your program must have the entry point.
+# Use 'main()' function if you want to have the entry point.
+# It is not necessary because you can also write code in a global space,
+# i.e. between or after all function definitions.
 
 # void function with one parameter
 function printvalue(x)

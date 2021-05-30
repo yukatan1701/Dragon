@@ -2,11 +2,12 @@
 # Let's write a function that calculates the n-th Fibonacci number.
 
 function fib(n)
-	if n == 0 or n == 1 then
-		return 1
+	if n == 0 or n == 1
+		ret_val = 1
+	else
+		ret_val = fib(n - 1) + fib(n - 2)
 	endif
-	return fib(n - 1) + fib(n - 2)
+	return ret_val
+	
+println fib(5)
 
-global
-	n = 5
-	println fib(n)

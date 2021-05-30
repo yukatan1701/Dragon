@@ -1,0 +1,17 @@
+# let's print matrix
+# use while-then-endwhile construction to create a loop
+
+i = 0
+while i < 8
+	j = 0
+	while j < 8
+		if (i + j) % 2 != 0
+			print "+ "
+		else
+			print "- "
+		endif
+		j = j + 1
+	endwhile
+	println " "
+	i = i + 1
+endwhile

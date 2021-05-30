@@ -20,7 +20,8 @@ Interpreter::VarTableItrPair Interpreter::getVarItr(
   auto VarItr = VT.find(Id->getName());
   if (VarItr == VT.end() && Exception)
     throw InterpreterException("Variable with name `" +
-        Id->getName() + "` does not exist in this scope");
+        Id->getName() + "` used at " + Id->getPos() +
+        " does not exist in this scope");
   return std::make_pair(VarItr, &VT);
 }
 
@@ -33,8 +34,7 @@ void Interpreter::processUnary(const PrefixOperator *Op, Token *Top) {
       Top = ConstItrPair.first->second;
     } else {
       throw InterpreterException("Variable with name `" + Id->getName() +
-                                 "` does not exist in this scope at " +
-                                 Op->getPos());
+          "` does not exist in this scope at " + Op->getPos());
     }
   }
   if (auto Int = dynamic_cast<Integer *>(Top)) {
@@ -286,12 +286,22 @@ Token *Interpreter::processBinary(
         return new Float(F1->getValue() / double(Int2->getValue()));
       assert(0);
     }
-    throw InterpreterException("Some type mismatch expected.");
+    throw InterpreterException("Type mismatch for binary operation at " +
+        Op->getPos());
   }
 
 }
 
-void processBinaryGoto(Token *OpLeft, Token *OpRight, std::size_t &Idx) {
+void Interpreter::processBinaryGoto(
+    Token *OpLeft, Token *OpRight, std::size_t &Idx) {
+  if (auto Id = dynamic_cast<Identifier *>(OpLeft)) {
+    auto VarItr = getVarItr(Id);
+    auto Bool = dynamic_cast<Boolean *>(VarItr.first->second);
+    if (!Bool)
+      throw InterpreterException("Boolean expected for goto at " +
+                                OpLeft->getPos());
+    OpLeft = Bool;
+  }
   if (auto Bool = dynamic_cast<Boolean *>(OpLeft)) {
     if (auto Int = dynamic_cast<Integer *>(OpRight)) {
       if (Bool->getValue()) {
@@ -328,15 +338,15 @@ void Interpreter::processAssign(Token *OpLeft, Token *OpRight) {
     } else if (auto IdRight = dynamic_cast<Identifier *>(OpRight)) {
       auto RightItr = getVarItr(IdRight);
       if (RightItr.first == RightItr.second->end())
-        throw InterpreterException("Failed to read variable `" + IdRight->getName() +
-                                   "` at " + OpLeft->getPos());
+        throw InterpreterException("Failed to read variable `" +
+            IdRight->getName() + "` at " + OpLeft->getPos());
       *Value = RightItr.first->second->cloneConst();
     } else {
       throw InterpreterException("Non-constant right expression at " +
                                 OpLeft->getPos());
     }
-    DRAGON_DEBUG(dbgs() << "[RUNTIME] New token for a value of left operand: " <<
-                 (*Value)->toString() << "\n");
+    DRAGON_DEBUG(dbgs() << "[RUNTIME] New token for a value of left operand: "
+                 << (*Value)->toString() << "\n");
     if (ItrPair.second == &mVarTableStack.back())
       mTmpTokens.back().insert(*Value);
     else
@@ -354,7 +364,6 @@ bool Interpreter::run(const Function &F) {
     for (auto Itr = PL[Idx].begin(); Itr != PL[Idx].end(); ++Itr) {
       DRAGON_DEBUG(dbgs() << "[RUNTIME] Checking token " << (*Itr)->toString()
                    << ".\n");
-      //DRAGON_DEBUG(dbgs() << "[RUNTIME] Is Kw: " << dynamic_cast<Keyword *>(*Itr) << "\n");
       auto Token = *Itr;
       if (dynamic_cast<Constant *>(Token)) {
         Stack.push(Token);
@@ -366,18 +375,20 @@ bool Interpreter::run(const Function &F) {
           auto ParamCount = FuncItr->second.getParamList().size();
           for (std::size_t I = 0; I < ParamCount; ++I) {
             if (Stack.empty())
-              throw InterpreterException("Not enough arguments");
+              throw InterpreterException("Not enough arguments for function at "
+                                        + Id->getPos());
             auto ArgToken = Stack.top();
             Constant *ConstValue = nullptr;
-            if (auto Id = dynamic_cast<Identifier *>(ArgToken)) {
-              auto VarItr = getVarItr(Id);
+            if (auto ArgId = dynamic_cast<Identifier *>(ArgToken)) {
+              auto VarItr = getVarItr(ArgId);
               DRAGON_DEBUG(dbgs() << "[RUNTIME] Add variable to call stack: "
                            << VarItr.first->second->toString() << "\n");
               ConstValue = VarItr.first->second->cloneConst();
             } else if (auto Const = dynamic_cast<Constant *>(ArgToken)) {
               ConstValue = Const->cloneConst();
             } else {
-              throw InterpreterException("Invalid argument type");
+              throw InterpreterException("Invalid argument type at " +
+                                         ArgToken->getPos());
             }
             mCallStack.push(ConstValue);
             Stack.pop();
@@ -422,8 +433,8 @@ bool Interpreter::run(const Function &F) {
               } else if (auto Const = dynamic_cast<Constant *>(Top)) {
                 RetConst = Const->cloneConst();
               } else {
-                throw InterpreterException("Unexpected kind of returning value at " +
-                                     Kw->getPos());
+                throw InterpreterException(
+                    "Unexpected kind of returning value at " + Kw->getPos());
               }
               mCallStack.push(RetConst);
               return true;

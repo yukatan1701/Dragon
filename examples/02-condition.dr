@@ -1,0 +1,19 @@
+# Let's learn how to use conditions.
+# Use if-else-endif constuction to create condition.
+# Also you can use if-else only.
+
+temperature = -40
+if temperature > 15
+	println "Warm"
+else
+	if temperature >= -10 and temperature <= 15
+		println "Cool"
+	else
+		println "Cold"
+	endif
+endif
+
+simple_cond = true
+if (simple_cond)
+	println "Simple condition."
+endif

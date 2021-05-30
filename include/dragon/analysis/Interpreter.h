@@ -36,6 +36,7 @@ private:
   void processUnary(const PrefixOperator *Op, Token *Top);
   void processAssign(Token *OpLeft, Token *OpRight);
   Token *processBinary(const BinaryOperator *Op, Token *OpLeft, Token *OpRight);
+  void processBinaryGoto(Token *OpLeft, Token *OpRight, std::size_t &Idx);
   VarTableItrPair getVarItr(const Identifier *Id, bool Exception=true);
   bool run(const Function &F);
 };

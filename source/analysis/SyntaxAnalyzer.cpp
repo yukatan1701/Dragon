@@ -9,7 +9,6 @@ typedef SyntaxAnalyzer::FuncMap FuncMap;
 void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
   typedef std::pair<Keyword *, std::size_t> IfWhilePos;
   typedef std::vector<Token *>::const_iterator TokenIterator;
-  // TODO: square brackets
   auto isFunction = [this, &F](const Identifier *Id) {
     return mFuncMap.find(Id->getName()) != mFuncMap.end() ||
            F.getName() == Id->getName();
@@ -53,10 +52,12 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
                   "call info stack for function `" << Id->toString() << "`\n");
               ArgCountStack.push(std::make_pair(0, Next));
             } else {
-              throw SyntaxException("'(' expected after function call");
+              throw SyntaxException("'(' expected after function call at " +
+                                    (*Next)->getPos());
             }
           } else {
-            throw SyntaxException("'(' expected after function call");
+            throw SyntaxException("'(' expected after function call at " +
+                                  Id->getPos());
           }
         } else {
           Line.push_back(Id);
@@ -78,9 +79,11 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
           break;
         } if (Pref->getKind() == Keyword::Kind::COMMA) {
           if (ArgCountStack.empty())
-            throw SyntaxException("No function call for comma.");
+            throw SyntaxException("No function call for comma at " +
+                                  Pref->getPos());
           if (std::next(ArgCountStack.top().second) == TokenItr)
-            throw SyntaxException("Empty argument of function call.");
+            throw SyntaxException("Empty argument of function call at " +
+                                  Pref->getPos());
           ++ArgCountStack.top().first;
           ArgCountStack.top().second = TokenItr;
           bool HasLeftBr = false;
@@ -118,7 +121,8 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
           auto IfPos = IfWhileStack.top().second;
           if (If->getKind() != Keyword::Kind::IF &&
               If->getKind() != Keyword::Kind::ELSE)
-            throw SyntaxException("No `if` or `else` for `endif` at " + Pref->getPos());
+            throw SyntaxException("No `if` or `else` for `endif` at " +
+                                  Pref->getPos());
           if (If->getKind() == Keyword::Kind::IF) {
             auto NotGotoList = generateNotGoto(PostfixList);
             PostfixList[IfPos].insert(PostfixList[IfPos].end(),
@@ -131,11 +135,13 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
           IfWhileStack.pop();
         } else if (Pref->getKind() == Keyword::Kind::ENDWHILE) {
           if (IfWhileStack.empty())
-            throw SyntaxException("No `while` for `endwhile` at " + Pref->getPos());
+            throw SyntaxException("No `while` for `endwhile` at " +
+                                  Pref->getPos());
           auto While = IfWhileStack.top().first;
           auto WhilePos = IfWhileStack.top().second;
           if (While->getKind() != Keyword::Kind::WHILE)
-            throw SyntaxException("No `while` for `endwhile` at " + Pref->getPos());
+            throw SyntaxException("No `while` for `endwhile` at " +
+                                  Pref->getPos());
           auto NotGotoList = generateNotGoto(PostfixList);
           PostfixList[WhilePos].insert(PostfixList[WhilePos].end(),
                                        NotGotoList.begin(), NotGotoList.end());
@@ -150,8 +156,7 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
           Stack.push(Pref);
         }
       } else if (auto Br = dynamic_cast<Bracket *>(TokenPtr)) {
-        if (Br->getKind() == Keyword::Kind::LEFT_PARENTHESIS ||
-            Br->getKind() == Keyword::Kind::LEFT_SQUARE) {
+        if (Br->getKind() == Keyword::Kind::LEFT_PARENTHESIS) {
           Stack.push(Br);
         } else if (Br->getKind() == Keyword::Kind::RIGHT_PARENTHESIS) {
           if (Stack.empty())
@@ -175,7 +180,8 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
               if (auto Id = dynamic_cast<Identifier *>(Stack.top())) {
                 if (isFunction(Id)) {
                   if (ArgCountStack.empty())
-                    throw SyntaxException("No function call for ')'");
+                    throw SyntaxException("No function call for ')' at " +
+                                          Id->getPos());
                   auto &ArgInfo = ArgCountStack.top();
                   if (std::next(ArgInfo.second) == TokenItr) {
                     if (ArgInfo.first > 0)
@@ -196,9 +202,11 @@ void SyntaxAnalyzer::generatePostfix(const TokenPtrList &TL, Function &F) {
                       "`: " << ExpectedParamCount << "/" << ArgInfo.first <<
                       "\n");
                   if (ExpectedParamCount < ArgInfo.first)
-                    throw SyntaxException("Too many arguments for function");
+                    throw SyntaxException("Too many arguments for function at "
+                                          + Id->getPos());
                   if (ExpectedParamCount > ArgInfo.first)
-                    throw SyntaxException("Too few arguments for function");
+                    throw SyntaxException("Too few arguments for function at "
+                                          + Id->getPos());
                   Line.push_back(Id);
                   ArgCountStack.pop();
                 }
@@ -311,12 +319,13 @@ SyntaxAnalyzer::SyntaxAnalyzer(const LexicalAnalyzer &LA) {
           Function Func(Name->getName());
           assert(!Func.getName().empty() && "Function name must not be empty!");
           if (TokenLine.size() < 3) {
-            throw SyntaxException("'(' expected after token at " + Name->getPos());
+            throw SyntaxException("'(' expected after token at " +
+                                  Name->getPos());
           }
           if (auto KwLeftPar = dynamic_cast<Keyword *>(TokenLine[2].get());
               KwLeftPar->getKind() == Keyword::Kind::LEFT_PARENTHESIS) {
             if (TokenLine.size() < 4) {
-              throw SyntaxException("'(' or parameter expected after token at " +
+              throw SyntaxException("'(' or parameter expected after token at "+
                                     KwLeftPar->getPos());
             }
             for (std::size_t I = 3; I < TokenLine.size(); I += 2) {
@@ -332,8 +341,8 @@ SyntaxAnalyzer::SyntaxAnalyzer(const LexicalAnalyzer &LA) {
                   // If ')' is the last token.
                   if (I + 2 != TokenLine.size())
                     throw SyntaxException(
-                        "Extra tokens after ')' in the function declaration at" +
-                        KwSep->getPos());
+                        "Extra tokens after ')' in the function declaration "
+                        "at " + KwSep->getPos());
                   break;
                 } else if (KwSep && KwSep->getKind() == Keyword::Kind::COMMA) {
                   continue;
@@ -346,10 +355,11 @@ SyntaxAnalyzer::SyntaxAnalyzer(const LexicalAnalyzer &LA) {
                          Keyword::Kind::RIGHT_PARENTHESIS) {
                 if (I + 1 != TokenLine.size())
                   throw SyntaxException(
-                      "Extra tokens after ')' in the function declaration at" +
+                      "Extra tokens after ')' in the function declaration at " +
                       KwSep->getPos());
               } else {
-                throw SyntaxException("Identifier expected after token at " + Token->getPos());
+                throw SyntaxException("Identifier expected after token at " +
+                                      Token->getPos());
               }
             }
             auto ReturnItr = getReturnIterator(std::next(Itr));

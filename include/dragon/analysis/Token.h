@@ -41,15 +41,12 @@ public:
   typedef int Priority;
   enum Kind {
     FUNCTION = 0,
-    COLON,
     QUOTE,
 
     /* brackets */
     BRACKETS_BEGIN,
     LEFT_PARENTHESIS,
     RIGHT_PARENTHESIS,
-    LEFT_SQUARE,
-    RIGHT_SQUARE,
     BRACKETS_END,
 
     /* unary operators (prefix) */
@@ -83,7 +80,6 @@ public:
     MODULE,
     EQUAL,
     NOT_EQUAL,
-
     LESS,
     LEQ,
     GREATER,
@@ -122,7 +118,8 @@ public:
 
   Priority getPriority() const {
     auto Itr = mKindToPriority.find(mKind);
-    assert(Itr != mKindToPriority.end() && "Every keyword must have a priority!");
+    assert(Itr != mKindToPriority.end() &&
+        "Every keyword must have a priority!");
     return Itr->second;
   }
 
@@ -137,11 +134,16 @@ public:
   static void addDynamicKeyword(const std::string &Word,
                                 std::vector<std::unique_ptr<Token>> &TL,
                                 const PosInfo &PI);
+
+  static bool isForbiddenKeyword(const std::string &Kw) {
+    return mForbiddenKws.find(Kw) != mForbiddenKws.end();
+  };
   virtual ~Keyword() {}
 private:
   static const std::string mPunctuations;
   static const Bimap<Kind, std::string> mKindToName;
   static const std::map<Kind, Priority> mKindToPriority;
+  static const std::set<std::string> mForbiddenKws;
   Kind mKind;
 };
 
@@ -170,7 +172,9 @@ public:
                           AssocKind AssocKind=LEFT)
       : Keyword(Kind, PI), mAssocKind(AssocKind) {}
   AssocKind getAssocKind() const { return mAssocKind; }
-  Token *clone() const { return new BinaryOperator(this->getKind(), mAssocKind); }
+  Token *clone() const {
+    return new BinaryOperator(this->getKind(), mAssocKind);
+  }
   virtual ~BinaryOperator() {}
 private:
   AssocKind mAssocKind;
@@ -192,7 +196,7 @@ public:
   std::string getName() const { return mName; }
   std::string toString() const { return "<id: " + mName + ">"; }
   Token *clone() const { return new Identifier(this->getName()); }
-  Identifier *cloneIdentifier() const { return new Identifier(this->getName()); }
+  Identifier *cloneIdentifier() const { return new Identifier(this->getName());}
   virtual ~Identifier() {}
 private:
   std::string mName;
@@ -211,7 +215,8 @@ public:
 class String : public Constant {
 public:
   String(const std::string &Str) : mString(Str) {}
-  String(const std::string &Str, const PosInfo &PI) : Constant(PI), mString(Str) {}
+  String(const std::string &Str, const PosInfo &PI)
+      : Constant(PI), mString(Str) {}
   std::string getValue() const { return mString; }
   std::string toString() const {
     return "<literal: " + (mString.empty() ? "(empty)" : mString) + ">";

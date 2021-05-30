@@ -1,8 +1,6 @@
 # Here's the comment!
 # Use 'println' to print value with a line break
 # or 'print' to print without it.
-# Also you can use 'space' to put " " character and
-# 'newline' to add a line break manually.
 
 a = 7 + 3
 b = (a + 2) * 8
@@ -18,6 +16,6 @@ println 1 ^ 0
 x = y = 15 & 2
 r = 2 | 4
 println x
-println "meow"
+println "some string"
 println false
 println (4 + 2.5) * 3

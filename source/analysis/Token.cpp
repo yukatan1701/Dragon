@@ -35,9 +35,6 @@ const Bimap<Keyword::Kind, std::string> Keyword::mKindToName = {
   KEYPAIR(Keyword::MODULE, "%"),
   KEYPAIR(Keyword::LEFT_PARENTHESIS, "("),
   KEYPAIR(Keyword::RIGHT_PARENTHESIS, ")"),
-  KEYPAIR(Keyword::LEFT_SQUARE, "["),
-  KEYPAIR(Keyword::RIGHT_SQUARE, "]"),
-  KEYPAIR(Keyword::COLON, ":"),
   KEYPAIR(Keyword::QUOTE, "\""),
   KEYPAIR(Keyword::GOTO_BIN, "goto"),
   KEYPAIR(Keyword::GOTO_UN, "goto*"),
@@ -56,7 +53,6 @@ const std::map<Keyword::Kind, Keyword::Priority> Keyword::mKindToPriority = {
   KEYPAIR(Keyword::ENDIF, -1),
   KEYPAIR(Keyword::WHILE, 99),
   KEYPAIR(Keyword::ENDWHILE, -1),
-  KEYPAIR(Keyword::COLON, -1), // TODO: is it necessary?
   KEYPAIR(Keyword::QUOTE, -1),
   KEYPAIR(Keyword::GOTO_BIN, 101),
   KEYPAIR(Keyword::GOTO_UN, 101),
@@ -64,8 +60,6 @@ const std::map<Keyword::Kind, Keyword::Priority> Keyword::mKindToPriority = {
 
   KEYPAIR(Keyword::LEFT_PARENTHESIS, 1),
   KEYPAIR(Keyword::RIGHT_PARENTHESIS, 1),
-  KEYPAIR(Keyword::LEFT_SQUARE, 1),
-  KEYPAIR(Keyword::RIGHT_SQUARE, 1),
 
   KEYPAIR(Keyword::UNARY_PLUS, 2),
   KEYPAIR(Keyword::UNARY_MINUS, 2),
@@ -101,6 +95,10 @@ const std::map<Keyword::Kind, Keyword::Priority> Keyword::mKindToPriority = {
   KEYPAIR(Keyword::ASSIGN, 13),
 
   KEYPAIR(Keyword::COMMA, 15),
+};
+
+const std::set<std::string> Keyword::mForbiddenKws = {
+  "goto", "goto*", "-$", "+$"
 };
 
 void Keyword::addDynamicKeyword(const std::string &Word,

@@ -1,0 +1,16 @@
+# Variables have two scopes: local and global.
+# If you want to use a global variable in a local space,
+# you should use `global` keyword.
+
+x = 8
+
+function f(x)
+	global x
+	x = x + 4
+	return
+	
+function main()
+	global x
+	f(x)
+	print x
+	return

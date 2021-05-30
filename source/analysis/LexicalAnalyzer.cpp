@@ -65,6 +65,8 @@ void LexicalAnalyzer::parseLine(const std::string &Line) {
         Next = Buffer.lookAhead(Itr);
       }
       if (Keyword::isKeyword(Word)) {
+        if (Keyword::isForbiddenKeyword(Word))
+          throw ParserException("Forbidden keyword at " + getErrorPos(Itr));
         Keyword::addDynamicKeyword(Word, TokenList, getPos(WordBegin));
       } else if (Boolean::isBoolean(Word)) {
         TokenList.push_back(std::make_unique<Boolean>(Word, getPos(WordBegin)));
